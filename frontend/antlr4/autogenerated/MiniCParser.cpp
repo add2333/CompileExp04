@@ -1,5 +1,5 @@
 
-// Generated from MiniC.g4 by ANTLR 4.12.0
+// Generated from /home/code/exp04-minic-expr/frontend/antlr4/MiniC.g4 by ANTLR 4.12.0
 
 
 #include "MiniCVisitor.h"
@@ -54,7 +54,7 @@ void minicParserInitialize() {
     std::vector<std::string>{
       "", "T_L_PAREN", "T_R_PAREN", "T_SEMICOLON", "T_L_BRACE", "T_R_BRACE", 
       "T_ASSIGN", "T_COMMA", "T_ADD", "T_SUB", "T_RETURN", "T_INT", "T_VOID", 
-      "T_ID", "T_DIGIT", "WS"
+      "T_ID", "T_INT_CONST", "WS"
     }
   );
   static const int32_t serializedATNSegment[] = {
@@ -490,7 +490,7 @@ MiniCParser::BlockItemContext* MiniCParser::blockItem() {
       case MiniCParser::T_L_BRACE:
       case MiniCParser::T_RETURN:
       case MiniCParser::T_ID:
-      case MiniCParser::T_DIGIT: {
+      case MiniCParser::T_INT_CONST: {
         enterOuterAlt(_localctx, 1);
         setState(58);
         statement();
@@ -1184,8 +1184,8 @@ tree::TerminalNode* MiniCParser::PrimaryExpContext::T_R_PAREN() {
   return getToken(MiniCParser::T_R_PAREN, 0);
 }
 
-tree::TerminalNode* MiniCParser::PrimaryExpContext::T_DIGIT() {
-  return getToken(MiniCParser::T_DIGIT, 0);
+tree::TerminalNode* MiniCParser::PrimaryExpContext::T_INT_CONST() {
+  return getToken(MiniCParser::T_INT_CONST, 0);
 }
 
 MiniCParser::LValContext* MiniCParser::PrimaryExpContext::lVal() {
@@ -1231,10 +1231,10 @@ MiniCParser::PrimaryExpContext* MiniCParser::primaryExp() {
         break;
       }
 
-      case MiniCParser::T_DIGIT: {
+      case MiniCParser::T_INT_CONST: {
         enterOuterAlt(_localctx, 2);
         setState(119);
-        match(MiniCParser::T_DIGIT);
+        match(MiniCParser::T_INT_CONST);
         break;
       }
 

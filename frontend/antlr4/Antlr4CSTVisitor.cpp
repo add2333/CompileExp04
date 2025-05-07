@@ -299,24 +299,21 @@ std::any MiniCCSTVisitor::visitUnaryExp(MiniCParser::UnaryExpContext * ctx)
 
 std::any MiniCCSTVisitor::visitPrimaryExp(MiniCParser::PrimaryExpContext * ctx)
 {
-    // 识别文法产生式 primaryExp: T_L_PAREN expr T_R_PAREN | T_DIGIT | lVal;
-
     ast_node * node = nullptr;
 
-    if (ctx->T_DIGIT()) {
+    if (ctx->T_INT_CONST()) {
+        // 识别 primaryExp：T_INT_DIGIT
         // 无符号整型字面量
-        // 识别 primaryExp: T_DIGIT
-
-        uint32_t val = (uint32_t) stoull(ctx->T_DIGIT()->getText());
-        int64_t lineNo = (int64_t) ctx->T_DIGIT()->getSymbol()->getLine();
+        // stoull 函数基数：0（自动）、8（八进制）、10（十进制）、16（十六进制）
+        std::string intText = ctx->T_INT_CONST()->getText();
+        uint32_t val = (uint32_t) std::stoull(intText, nullptr, 0);
+        int64_t lineNo = (int64_t) ctx->T_INT_CONST()->getSymbol()->getLine();
         node = ast_node::New(digit_int_attr{val, lineNo});
     } else if (ctx->lVal()) {
         // 具有左值的表达式
-        // 识别 primaryExp: lVal
         node = std::any_cast<ast_node *>(visitLVal(ctx->lVal()));
     } else if (ctx->expr()) {
         // 带有括号的表达式
-        // primaryExp: T_L_PAREN expr T_R_PAREN
         node = std::any_cast<ast_node *>(visitExpr(ctx->expr()));
     }
 

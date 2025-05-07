@@ -4,6 +4,7 @@
 	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
 	"version": "0.2.0",
 	"configurations": [
+
 		{
 			"type": "antlr-debug",
 			"request": "launch",
@@ -29,7 +30,7 @@
 			"args": ["-S", "-I", "-D", "-o", "tests/test2-2.ir", "tests/test2-2.c"],
 			"cwd": "${workspaceFolder}",
 			// 不需要编译时可注释掉
-			"preLaunchTask": "CMake: build"
+			// "preLaunchTask": "CMake: build"
 		},
 		{
 			// 可采用GCC或者Clang编译器
@@ -107,7 +108,7 @@
 				}
 			],
 			// 不需要编译时可注释掉
-			"preLaunchTask": "CMake: build"
+			//"preLaunchTask": "CMake: build"
 		},
 		{
 			// 可采用GCC或者Clang编译器
@@ -118,7 +119,7 @@
 			"args": ["-S", "-A", "-o", "tests/test2-2.s", "tests/test2-2.c"],
 			"cwd": "${workspaceFolder}",
 			// 不需要编译时可注释掉
-			"preLaunchTask": "CMake: build"
+			//"preLaunchTask": "CMake: build"
 		},
 		{
 			"name": "Qemu Debug ARM32",
