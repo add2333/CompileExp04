@@ -4,6 +4,7 @@
 COLOR_RESET=\033[0m
 COLOR_INFO=\033[1;34m
 COLOR_OK=\033[1;32m
+COLOR_WARN=\033[1;33m
 
 # --- Build Settings ---
 SRC_DIR     = .
@@ -22,16 +23,24 @@ GRAMMAR_FILE    = MiniC.g4
 all: build
 
 # --- Build Project ---
-build:
-	@echo "Configuring cmake..."
-	cmake -B $(BUILD_DIR) -S $(SRC_DIR) $(CXXFLAGS)
-	@echo "Building project with cmake..."
-	cmake --build $(BUILD_DIR) --parallel
+build: 
+	@echo "$(COLOR_INFO)[BUILD] Configuring cmake...$(COLOR_RESET)"
+	@cmake -B $(BUILD_DIR) -S $(SRC_DIR) $(CXXFLAGS)
+	@echo "$(COLOR_INFO)[BUILD] Building project with cmake...$(COLOR_RESET)"
+	@cmake --build $(BUILD_DIR) --parallel
 
-# --- Run MiniC ---
-runminic runm:
-	@echo "$(COLOR_INFO)[MINIC] Running MiniC...$(COLOR_RESET)"
-	${MINIC_EXE} -S -A ${ARGS}
+# --- Run MiniC with Short Commands ---
+runmt: build
+	@echo "$(COLOR_INFO)[MINIC] Generating .png...$(COLOR_RESET)"
+	$(MINIC_EXE) -S -T -A -o ./tests/test$(ARGS).png ./tests/test$(ARGS).c
+
+runmi: build
+	@echo "$(COLOR_INFO)[MINIC] Generating .ir...$(COLOR_RESET)"
+	$(MINIC_EXE) -S -I -A -o ./tests/test$(ARGS).ir ./tests/test$(ARGS).c
+
+runms: build
+	@echo "$(COLOR_INFO)[MINIC] Generating .s...$(COLOR_RESET)"
+	$(MINIC_EXE) -S -A -o ./tests/test$(ARGS).s ./tests/test$(ARGS).c
 
 # --- Generate ANTLR Lexer/Parser ---
 antlr4:
@@ -52,9 +61,8 @@ antlr4:
 
 	@echo "$(COLOR_OK)[ANTLR] Generated successfully at $(ANTLR_OUT_DIR)$(COLOR_RESET)"
 
-
 # --- Clean Build ---
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all build clean runminic runm antlr4 
+.PHONY: all build clean runmt runmi runms antlr4

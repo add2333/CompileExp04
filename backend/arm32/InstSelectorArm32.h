@@ -76,6 +76,15 @@ protected:
     /// @param inst IR指令
     void translate_sub_int32(Instruction * inst);
 
+    /// @brief 整数求负指令翻译成ARM32汇编
+    /// @param inst IR指令
+    void translate_neg_int32(Instruction * inst);
+
+    /// @brief 单目操作指令翻译成ARM32汇编
+    /// @param inst IR指令
+    /// @param operator_name 操作码
+    void translate_one_operator(Instruction * inst, string operator_name);
+    
     /// @brief 二元操作指令翻译成ARM32汇编
     /// @param inst IR指令
     /// @param operator_name 操作码
@@ -90,6 +99,8 @@ protected:
     /// @param inst
     ///
     void translate_arg(Instruction * inst);
+
+    // TODO: 之后可以在这里增加操作指令
 
     ///
     /// @brief 输出IR指令

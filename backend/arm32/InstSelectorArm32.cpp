@@ -49,6 +49,7 @@ InstSelectorArm32::InstSelectorArm32(vector<Instruction *> & _irCode,
 
     translator_handlers[IRInstOperator::IRINST_OP_ADD_I] = &InstSelectorArm32::translate_add_int32;
     translator_handlers[IRInstOperator::IRINST_OP_SUB_I] = &InstSelectorArm32::translate_sub_int32;
+	translator_handlers[IRInstOperator::IRINST_OP_NEG_I] = &InstSelectorArm32::translate_neg_int32;
 
     translator_handlers[IRInstOperator::IRINST_OP_FUNC_CALL] = &InstSelectorArm32::translate_call;
     translator_handlers[IRInstOperator::IRINST_OP_ARG] = &InstSelectorArm32::translate_arg;
@@ -219,6 +220,59 @@ void InstSelectorArm32::translate_assign(Instruction * inst)
     }
 }
 
+/// @brief 一元操作指令翻译成ARM32汇编
+/// @param inst IR指令
+/// @param operator_name 操作码
+/// @param rs_reg_no 结果寄存器号
+/// @param op1_reg_no 源操作数寄存器号
+void InstSelectorArm32::translate_one_operator(Instruction * inst, string operator_name)
+{
+	Value * result = inst;
+	Value * arg1 = inst->getOperand(0);
+
+	int32_t arg1_reg_no = arg1->getRegId();
+	int32_t result_reg_no = inst->getRegId();
+	int32_t load_result_reg_no, load_arg1_reg_no;
+
+	// 看arg1是否是寄存器，若是则寄存器寻址，否则要load变量到寄存器中
+	if (arg1_reg_no == -1) {
+
+		// 分配一个寄存器r8
+		load_arg1_reg_no = simpleRegisterAllocator.Allocate(arg1);
+
+		// arg1 -> r8，这里可能由于偏移不满足指令的要求，需要额外分配寄存器
+		iloc.load_var(load_arg1_reg_no, arg1);
+	} else {
+		load_arg1_reg_no = arg1_reg_no;
+	}
+
+	// 看结果变量是否是寄存器，若不是则需要分配一个新的寄存器来保存运算的结果
+	if (result_reg_no == -1) {
+		// 分配一个寄存器r9，用于暂存结果
+		load_result_reg_no = simpleRegisterAllocator.Allocate(result);
+	} else {
+		load_result_reg_no = result_reg_no;
+	}
+
+	// r8 + r9 -> r10
+	iloc.inst(operator_name,
+			  PlatformArm32::regName[load_result_reg_no],
+			  PlatformArm32::regName[load_arg1_reg_no]);
+
+	// 结果不是寄存器，则需要把rs_reg_name保存到结果变量中
+	if (result_reg_no == -1) {
+
+		// 这里使用预留的临时寄存器，因为立即数可能过大，必须借助寄存器才可操作。
+
+		// r10 -> result
+		iloc.store_var(load_result_reg_no, result, ARM32_TMP_REG_NO);
+	}
+
+	// 释放寄存器
+	simpleRegisterAllocator.free(arg1);
+	simpleRegisterAllocator.free(result);
+}
+
 /// @brief 二元操作指令翻译成ARM32汇编
 /// @param inst IR指令
 /// @param operator_name 操作码
@@ -301,6 +355,13 @@ void InstSelectorArm32::translate_add_int32(Instruction * inst)
 void InstSelectorArm32::translate_sub_int32(Instruction * inst)
 {
     translate_two_operator(inst, "sub");
+}
+
+/// @brief 整数求负指令翻译成ARM32汇编
+/// @param inst IR指令
+void InstSelectorArm32::translate_neg_int32(Instruction * inst)
+{
+	translate_one_operator(inst, "neg");
 }
 
 /// @brief 函数调用指令翻译成ARM32汇编
