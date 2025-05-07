@@ -51,10 +51,7 @@ addExp: unaryExp (addOp unaryExp)*;
 addOp: T_ADD | T_SUB;
 
 // 一元表达式
-unaryExp:
-	(T_SUB unaryExp)
-	| primaryExp
-	| T_ID T_L_PAREN realParamList? T_R_PAREN;
+unaryExp: primaryExp | T_ID T_L_PAREN realParamList? T_R_PAREN;
 
 // 基本表达式：括号表达式、整数、左值表达式
 primaryExp: T_L_PAREN expr T_R_PAREN | T_INT_CONST | lVal;
@@ -88,7 +85,7 @@ T_ID: [a-zA-Z_][a-zA-Z0-9_]*;
 T_INT_CONST:
 	HEX_INT // 0x 或 0X 开头的十六进制
 	| OCT_INT // 0 开头但不是 0 本身的八进制
-	| DEC_INT; // 十进制
+	| DEC_INT ; // 十进制
 
 fragment HEX_INT: ('0x' | '0X') [0-9a-fA-F]+;
 fragment OCT_INT: '0' [0-7]+;
