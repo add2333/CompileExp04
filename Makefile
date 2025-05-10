@@ -32,15 +32,20 @@ build:
 # --- Run MiniC with Short Commands ---
 runmt: build
 	@echo "$(COLOR_INFO)[MINIC] Generating .png...$(COLOR_RESET)"
-	$(MINIC_EXE) -S -T -A -o ./tests/test$(ARGS).png ./tests/test$(ARGS).c
+	$(MINIC_EXE) -S -T -A -o ./tests/ast/test$(ARGS).png ./tests/test$(ARGS).c
 
 runmi: build
 	@echo "$(COLOR_INFO)[MINIC] Generating .ir...$(COLOR_RESET)"
-	$(MINIC_EXE) -S -I -A -o ./tests/test$(ARGS).ir ./tests/test$(ARGS).c
+	$(MINIC_EXE) -S -I -A -o ./tests/ir/test$(ARGS).ir ./tests/test$(ARGS).c
 
 runms: build
 	@echo "$(COLOR_INFO)[MINIC] Generating .s...$(COLOR_RESET)"
-	$(MINIC_EXE) -S -A -o ./tests/test$(ARGS).s ./tests/test$(ARGS).c
+	$(MINIC_EXE) -S -A -o ./tests/asm/test$(ARGS).s ./tests/test$(ARGS).c
+
+# 可执行文件生成
+runmc: build runms
+	@echo "$(COLOR_INFO)[MINIC] Generating executable...$(COLOR_RESET)"
+	arm-linux-gnueabihf-gcc -static -g -o ./tests/exec/test$(ARGS) tests/test$(ARGS).s
 
 # --- Generate ANTLR Lexer/Parser ---
 antlr4:
@@ -61,8 +66,14 @@ antlr4:
 
 	@echo "$(COLOR_OK)[ANTLR] Generated successfully at $(ANTLR_OUT_DIR)$(COLOR_RESET)"
 
+# --- Packaging ---
+package: clean build
+	@echo "$(COLOR_INFO)[PACKAGE] Packaging project...$(COLOR_RESET)"
+	cd $(BUILD_DIR) && cpack --config CPackSourceConfig.cmake
+	@echo "$(COLOR_OK)[PACKAGE] Project packaged successfully at $(BUILD_DIR)$(COLOR_RESET)"
+
 # --- Clean Build ---
-clean:
+clean: 
 	rm -rf $(BUILD_DIR)
 
 .PHONY: all build clean runmt runmi runms antlr4

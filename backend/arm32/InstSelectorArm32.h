@@ -80,11 +80,23 @@ protected:
     /// @param inst IR指令
     void translate_neg_int32(Instruction * inst);
 
+	/// @brief 整数乘法指令翻译成ARM32汇编
+	/// @param inst IR指令
+	void translate_mul_int32(Instruction * inst);
+
+	/// @brief 整数除法指令翻译成ARM32汇编
+	/// @param inst IR指令
+	void translate_div_int32(Instruction * inst);
+
+	/// @brief 整数取模指令翻译成ARM32汇编
+	/// @param inst IR指令
+	void translate_mod_int32(Instruction * inst);
+
     /// @brief 单目操作指令翻译成ARM32汇编
     /// @param inst IR指令
     /// @param operator_name 操作码
     void translate_one_operator(Instruction * inst, string operator_name);
-    
+
     /// @brief 二元操作指令翻译成ARM32汇编
     /// @param inst IR指令
     /// @param operator_name 操作码

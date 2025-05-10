@@ -18,6 +18,7 @@
 #include "Common.h"
 #include "ILocArm32.h"
 #include "InstSelectorArm32.h"
+#include "Instruction.h"
 #include "PlatformArm32.h"
 
 #include "PointerType.h"
@@ -28,6 +29,7 @@
 #include "GotoInstruction.h"
 #include "FuncCallInstruction.h"
 #include "MoveInstruction.h"
+#include "Value.h"
 
 /// @brief 构造函数
 /// @param _irCode 指令
@@ -50,6 +52,9 @@ InstSelectorArm32::InstSelectorArm32(vector<Instruction *> & _irCode,
     translator_handlers[IRInstOperator::IRINST_OP_ADD_I] = &InstSelectorArm32::translate_add_int32;
     translator_handlers[IRInstOperator::IRINST_OP_SUB_I] = &InstSelectorArm32::translate_sub_int32;
 	translator_handlers[IRInstOperator::IRINST_OP_NEG_I] = &InstSelectorArm32::translate_neg_int32;
+	translator_handlers[IRInstOperator::IRINST_OP_MUL_I] = &InstSelectorArm32::translate_mul_int32;
+	translator_handlers[IRInstOperator::IRINST_OP_DIV_I] = &InstSelectorArm32::translate_div_int32;
+	translator_handlers[IRInstOperator::IRINST_OP_MOD_I] = &InstSelectorArm32::translate_mod_int32;
 
     translator_handlers[IRInstOperator::IRINST_OP_FUNC_CALL] = &InstSelectorArm32::translate_call;
     translator_handlers[IRInstOperator::IRINST_OP_ARG] = &InstSelectorArm32::translate_arg;
@@ -362,6 +367,92 @@ void InstSelectorArm32::translate_sub_int32(Instruction * inst)
 void InstSelectorArm32::translate_neg_int32(Instruction * inst)
 {
 	translate_one_operator(inst, "neg");
+}
+
+/// @brief 整数乘法指令翻译成ARM32汇编
+/// @param inst IR指令
+void InstSelectorArm32::translate_mul_int32(Instruction * inst)
+{
+	translate_two_operator(inst, "mul");
+}
+
+/// @brief 整数除法指令翻译成ARM32汇编
+/// @param inst IR指令
+void InstSelectorArm32::translate_div_int32(Instruction * inst)
+{
+	translate_two_operator(inst, "sdiv");
+}
+
+/// @brief 整数取模指令翻译成ARM32汇编
+/// @param inst IR指令
+void InstSelectorArm32::translate_mod_int32(Instruction * inst)
+{
+    // ARM32没有MOD指令，使用DIV和MUL实现
+    // 计算 a % b = a - (a / b) * b
+
+    Value * result = inst;
+    Value * arg1 = inst->getOperand(0); // 被除数 a
+    Value * arg2 = inst->getOperand(1); // 除数 b
+
+    int32_t arg1_reg_no = arg1->getRegId();
+    int32_t arg2_reg_no = arg2->getRegId();
+    int32_t result_reg_no = inst->getRegId();
+    int32_t load_result_reg_no, load_arg1_reg_no, load_arg2_reg_no, temp_reg_no;
+
+    // 加载arg1到寄存器
+    if (arg1_reg_no == -1) {
+        load_arg1_reg_no = simpleRegisterAllocator.Allocate(arg1);
+        iloc.load_var(load_arg1_reg_no, arg1);
+    } else {
+        load_arg1_reg_no = arg1_reg_no;
+    }
+
+    // 加载arg2到寄存器
+    if (arg2_reg_no == -1) {
+        load_arg2_reg_no = simpleRegisterAllocator.Allocate(arg2);
+        iloc.load_var(load_arg2_reg_no, arg2);
+    } else {
+        load_arg2_reg_no = arg2_reg_no;
+    }
+
+    // 分配结果寄存器
+    if (result_reg_no == -1) {
+        load_result_reg_no = simpleRegisterAllocator.Allocate(result);
+    } else {
+        load_result_reg_no = result_reg_no;
+    }
+
+    // 分配临时寄存器用于存储除法结果
+    temp_reg_no = simpleRegisterAllocator.Allocate();
+
+    // 计算 a / b 到临时寄存器
+    iloc.inst("sdiv",
+              PlatformArm32::regName[temp_reg_no],
+              PlatformArm32::regName[load_arg1_reg_no],
+              PlatformArm32::regName[load_arg2_reg_no]);
+
+    // 计算 (a / b) * b 到临时寄存器
+    iloc.inst("mul",
+              PlatformArm32::regName[temp_reg_no],
+              PlatformArm32::regName[temp_reg_no],
+              PlatformArm32::regName[load_arg2_reg_no]);
+
+    // 计算 a - (a / b) * b 到结果寄存器
+    iloc.inst("sub",
+              PlatformArm32::regName[load_result_reg_no],
+              PlatformArm32::regName[load_arg1_reg_no],
+              PlatformArm32::regName[temp_reg_no]);
+
+    // 如果结果不是寄存器，则存回内存
+    if (result_reg_no == -1) {
+        iloc.store_var(load_result_reg_no, result, ARM32_TMP_REG_NO);
+    }
+
+    // 释放寄存器
+    simpleRegisterAllocator.free(arg1);
+    simpleRegisterAllocator.free(arg2);
+    simpleRegisterAllocator.free(result);
+    simpleRegisterAllocator.free(temp_reg_no);
 }
 
 /// @brief 函数调用指令翻译成ARM32汇编
