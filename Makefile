@@ -12,6 +12,7 @@ BUILD_DIR   = ./build
 CXX         = clang++
 CXXFLAGS    = -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER:FILEPATH=/usr/bin/$(CXX) -G Ninja
 MINIC_EXE   = $(BUILD_DIR)/minic
+IRCompiler  = ./tools/IRCompiler/Linux-x86_64/Ubuntu-22.04/IRCompiler
 
 # --- ANTLR Settings ---
 ANTLR_JAR       = tools/antlr-4.13.2-complete.jar
@@ -23,29 +24,44 @@ GRAMMAR_FILE    = MiniC.g4
 all: build
 
 # --- Build Project ---
-build: 
+build:
 	@echo "$(COLOR_INFO)[BUILD] Configuring cmake...$(COLOR_RESET)"
 	@cmake -B $(BUILD_DIR) -S $(SRC_DIR) $(CXXFLAGS)
 	@echo "$(COLOR_INFO)[BUILD] Building project with cmake...$(COLOR_RESET)"
 	@cmake --build $(BUILD_DIR) --parallel
 
 # --- Run MiniC with Short Commands ---
-runmt: build
+runmt:
 	@echo "$(COLOR_INFO)[MINIC] Generating .png...$(COLOR_RESET)"
-	$(MINIC_EXE) -S -T -A -o ./tests/ast/test$(ARGS).png ./tests/test$(ARGS).c
+	$(MINIC_EXE) -S -T -A -o ./tests/ast/$(ARGS).png ./tests/$(ARGS).c
 
-runmi: build
+runmi:
 	@echo "$(COLOR_INFO)[MINIC] Generating .ir...$(COLOR_RESET)"
-	$(MINIC_EXE) -S -I -A -o ./tests/ir/test$(ARGS).ir ./tests/test$(ARGS).c
+	$(MINIC_EXE) -S -I -A -o ./tests/ir/$(ARGS).ir ./tests/$(ARGS).c
 
-runms: build
+runir:
+	@echo "$(COLOR_INFO)[IRCompiler] Compiling IR...$(COLOR_RESET)"
+	${IRCompiler} -R ./tests/ir/$(ARGS).ir
+
+runms:
 	@echo "$(COLOR_INFO)[MINIC] Generating .s...$(COLOR_RESET)"
-	$(MINIC_EXE) -S -A -o ./tests/asm/test$(ARGS).s ./tests/test$(ARGS).c
+	$(MINIC_EXE) -S -A -o ./tests/asm/$(ARGS).s ./tests/$(ARGS).c
 
-# 可执行文件生成
-runmc: build runms
+runmc:
 	@echo "$(COLOR_INFO)[MINIC] Generating executable...$(COLOR_RESET)"
-	arm-linux-gnueabihf-gcc -static -g -o ./tests/exec/test$(ARGS) tests/test$(ARGS).s
+	arm-linux-gnueabihf-gcc -static -g -o ./tests/exec/$(ARGS) ./tests/asm/$(ARGS).s ./tests/asm/std.s
+
+runall: build
+	@echo "$(COLOR_INFO)[RUNALL] Running all tests...$(COLOR_RESET)"
+	@for file in $(shell find ./tests -type f -name 'test*.c'); do \
+		base=$$(basename $$file .c);  \
+		echo "$(COLOR_INFO)[RUNALL] Processing $$base...$(COLOR_RESET)"; \
+		$(MAKE) runmt ARGS=$$base; \
+		$(MAKE) runmi ARGS=$$base; \
+		$(MAKE) runms ARGS=$$base; \
+		$(MAKE) runmc ARGS=$$base; \
+    done
+	@echo "$(COLOR_OK)[RUNALL] All tests completed.$(COLOR_RESET)"
 
 # --- Generate ANTLR Lexer/Parser ---
 antlr4:
@@ -76,4 +92,19 @@ package: clean build
 clean: 
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all build clean runmt runmi runms antlr4
+# --- Help ---
+help:
+	@echo "可用的make命令："
+	@echo "  make all       - 默认目标，构建项目"
+	@echo "  make build     - 构建项目"
+	@echo "  make clean     - 清理构建文件"
+	@echo "  make runmt     - 运行MiniC并生成AST图像(.png)"
+	@echo "  make runmi     - 运行MiniC并生成中间代码(.ir)"
+	@echo "  make runir     - 使用IRCompiler编译中间代码(.ir)"
+	@echo "  make runms     - 运行MiniC并生成汇编代码(.s)"
+	@echo "  make runmc     - 使用arm-linux-gnueabihf-gcc生成可执行文件"
+	@echo "  make runall    - 构建并运行所有测试"
+	@echo "  make antlr4    - 生成ANTLR词法分析器和语法分析器"
+	@echo "  make package   - 打包项目"
+
+.PHONY: all build clean runmt runmi runir runms runmc runall antlr4 help
