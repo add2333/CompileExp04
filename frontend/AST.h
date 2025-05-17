@@ -101,6 +101,33 @@ enum class ast_operator_type : int {
     /// @brief 单目运算符-
     AST_OP_NEG,
 
+    /// @brief 关系运算符<
+    AST_OP_LT,
+
+    /// @brief 关系运算符>
+    AST_OP_GT,
+
+    /// @brief 关系运算符<=
+    AST_OP_LE,
+
+    /// @brief 关系运算符>=
+    AST_OP_GE,
+
+    /// @brief 相等运算符==
+    AST_OP_EQ,
+
+    /// @brief 不等运算符!=
+    AST_OP_NE,
+
+    /// @brief 逻辑与运算符&&
+    AST_OP_AND,
+
+    /// @brief 逻辑或运算符||
+    AST_OP_OR,
+
+    /// @brief 逻辑非运算符!
+    AST_OP_NOT,
+
     // TODO 抽象语法树其它内部节点运算符追加
 
     /// @brief 最大标识符，表示非法运算符

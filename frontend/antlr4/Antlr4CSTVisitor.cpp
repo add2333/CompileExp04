@@ -193,9 +193,8 @@ std::any MiniCCSTVisitor::visitReturnStatement(MiniCParser::ReturnStatementConte
 /// @param ctx CST上下文
 std::any MiniCCSTVisitor::visitExpr(MiniCParser::ExprContext * ctx)
 {
-    // 识别产生式：expr: addExp;
-
-    return visitAddExp(ctx->addExp());
+    // 识别文法产生式：expr: logicOrExp;
+    return visitLogicOrExp(ctx->logicOrExp());
 }
 
 std::any MiniCCSTVisitor::visitAssignStatement(MiniCParser::AssignStatementContext * ctx)
@@ -217,6 +216,174 @@ std::any MiniCCSTVisitor::visitBlockStatement(MiniCParser::BlockStatementContext
     // 识别文法产生式 blockStatement: block
 
     return visitBlock(ctx->block());
+}
+
+/// @brief 非终结运算符logicOrExp的遍历
+/// @param ctx CST上下文
+std::any MiniCCSTVisitor::visitLogicOrExp(MiniCParser::LogicOrExpContext * ctx)
+{
+    // 识别的文法产生式：logicOrExp: logicAndExp (T_OR logicAndExp)*;
+
+    if (ctx->T_OR().empty()) {
+        // 没有OR运算符，则说明闭包识别为0，只识别了第一个非终结符logicAndExp
+        return visitLogicAndExp(ctx->logicAndExp()[0]);
+    }
+
+    ast_node *left, *right;
+
+    // 存在OR运算符
+    auto opsCtxVec = ctx->T_OR();
+
+    // 有操作符，肯定会进循环，使得right设置正确的值
+    for (int k = 0; k < (int) opsCtxVec.size(); k++) {
+        if (k == 0) {
+            // 左操作数
+            left = std::any_cast<ast_node *>(visitLogicAndExp(ctx->logicAndExp()[k]));
+        }
+
+        // 右操作数
+        right = std::any_cast<ast_node *>(visitLogicAndExp(ctx->logicAndExp()[k + 1]));
+
+        // 新建结点作为下一个运算符的左操作符
+        left = ast_node::New(ast_operator_type::AST_OP_OR, left, right, nullptr);
+    }
+
+    return left;
+}
+
+/// @brief 非终结运算符logicAndExp的遍历
+/// @param ctx CST上下文
+std::any MiniCCSTVisitor::visitLogicAndExp(MiniCParser::LogicAndExpContext * ctx)
+{
+    // 识别的文法产生式：logicAndExp: equalityExp (T_AND equalityExp)*;
+
+    if (ctx->T_AND().empty()) {
+        // 没有AND运算符，则说明闭包识别为0，只识别了第一个非终结符equalityExp
+        return visitEqualityExp(ctx->equalityExp()[0]);
+    }
+
+    ast_node *left, *right;
+
+    // 存在AND运算符
+    auto opsCtxVec = ctx->T_AND();
+
+    // 有操作符，肯定会进循环，使得right设置正确的值
+    for (int k = 0; k < (int) opsCtxVec.size(); k++) {
+        if (k == 0) {
+            // 左操作数
+            left = std::any_cast<ast_node *>(visitEqualityExp(ctx->equalityExp()[k]));
+        }
+
+        // 右操作数
+        right = std::any_cast<ast_node *>(visitEqualityExp(ctx->equalityExp()[k + 1]));
+
+        // 新建结点作为下一个运算符的左操作符
+        left = ast_node::New(ast_operator_type::AST_OP_AND, left, right, nullptr);
+    }
+
+    return left;
+}
+
+/// @brief 非终结运算符equalityExp的遍历
+/// @param ctx CST上下文
+std::any MiniCCSTVisitor::visitEqualityExp(MiniCParser::EqualityExpContext * ctx)
+{
+    // 识别的文法产生式：equalityExp: relationalExp (equalityOp relationalExp)*;
+
+    if (ctx->equalityOp().empty()) {
+        // 没有equalityOp运算符，则说明闭包识别为0，只识别了第一个非终结符relationalExp
+        return visitRelationalExp(ctx->relationalExp()[0]);
+    }
+
+    ast_node *left, *right;
+
+    // 存在equalityOp运算符
+    auto opsCtxVec = ctx->equalityOp();
+
+    // 有操作符，肯定会进循环，使得right设置正确的值
+    for (int k = 0; k < (int) opsCtxVec.size(); k++) {
+        // 获取运算符
+        ast_operator_type op = std::any_cast<ast_operator_type>(visitEqualityOp(opsCtxVec[k]));
+
+        if (k == 0) {
+            // 左操作数
+            left = std::any_cast<ast_node *>(visitRelationalExp(ctx->relationalExp()[k]));
+        }
+
+        // 右操作数
+        right = std::any_cast<ast_node *>(visitRelationalExp(ctx->relationalExp()[k + 1]));
+
+        // 新建结点作为下一个运算符的左操作符
+        left = ast_node::New(op, left, right, nullptr);
+    }
+
+    return left;
+}
+
+/// @brief 非终结运算符equalityOp的遍历
+/// @param ctx CST上下文
+std::any MiniCCSTVisitor::visitEqualityOp(MiniCParser::EqualityOpContext * ctx)
+{
+    // 识别的文法产生式：equalityOp: T_EQ | T_NE;
+
+    if (ctx->T_EQ()) {
+        return ast_operator_type::AST_OP_EQ;
+    } else {
+        return ast_operator_type::AST_OP_NE;
+    }
+}
+
+/// @brief 非终结运算符relationalExp的遍历
+/// @param ctx CST上下文
+std::any MiniCCSTVisitor::visitRelationalExp(MiniCParser::RelationalExpContext * ctx)
+{
+    // 识别的文法产生式：relationalExp: addExp (relationalOp addExp)*;
+
+    if (ctx->relationalOp().empty()) {
+        // 没有relationalOp运算符，则说明闭包识别为0，只识别了第一个非终结符addExp
+        return visitAddExp(ctx->addExp()[0]);
+    }
+
+    ast_node *left, *right;
+
+    // 存在relationalOp运算符
+    auto opsCtxVec = ctx->relationalOp();
+
+    // 有操作符，肯定会进循环，使得right设置正确的值
+    for (int k = 0; k < (int) opsCtxVec.size(); k++) {
+        // 获取运算符
+        ast_operator_type op = std::any_cast<ast_operator_type>(visitRelationalOp(opsCtxVec[k]));
+
+        if (k == 0) {
+            // 左操作数
+            left = std::any_cast<ast_node *>(visitAddExp(ctx->addExp()[k]));
+        }
+
+        // 右操作数
+        right = std::any_cast<ast_node *>(visitAddExp(ctx->addExp()[k + 1]));
+
+        // 新建结点作为下一个运算符的左操作符
+        left = ast_node::New(op, left, right, nullptr);
+    }
+
+    return left;
+}
+
+/// @brief 非终结运算符relationalOp的遍历
+/// @param ctx CST上下文
+std::any MiniCCSTVisitor::visitRelationalOp(MiniCParser::RelationalOpContext * ctx)
+{
+    // 识别的文法产生式：relationalOp: T_LT | T_GT | T_LE | T_GE;
+
+    if (ctx->T_LT()) {
+        return ast_operator_type::AST_OP_LT;
+    } else if (ctx->T_GT()) {
+        return ast_operator_type::AST_OP_GT;
+    } else if (ctx->T_LE()) {
+        return ast_operator_type::AST_OP_LE;
+    } else {
+        return ast_operator_type::AST_OP_GE;
+    }
 }
 
 std::any MiniCCSTVisitor::visitAddExp(MiniCParser::AddExpContext * ctx)
@@ -317,12 +484,12 @@ std::any MiniCCSTVisitor::visitMulOp(MiniCParser::MulOpContext * ctx)
 
 std::any MiniCCSTVisitor::visitUnaryExp(MiniCParser::UnaryExpContext * ctx)
 {
-    // 识别文法产生式：unaryExp: (T_SUB unaryExp) | primaryExp | T_ID T_L_PAREN realParamList? T_R_PAREN;
-	if (ctx->primaryExp()) {
+    // 识别文法产生式：unaryExp: (T_SUB unaryExp) | (T_NOT unaryExp) | primaryExp | T_ID T_L_PAREN realParamList?
+    // T_R_PAREN;
+    if (ctx->primaryExp()) {
         // 普通表达式
         return visitPrimaryExp(ctx->primaryExp());
     } else if (ctx->T_ID()) {
-
         // 创建函数调用名终结符节点
         ast_node * funcname_node = ast_node::New(ctx->T_ID()->getText(), (int64_t) ctx->T_ID()->getSymbol()->getLine());
 
@@ -342,6 +509,11 @@ std::any MiniCCSTVisitor::visitUnaryExp(MiniCParser::UnaryExpContext * ctx)
         ast_node * expr_node = std::any_cast<ast_node *>(visitUnaryExp(ctx->unaryExp()));
         ast_node * negative_node = ast_node::New(ast_operator_type::AST_OP_NEG, expr_node, nullptr);
         return negative_node;
+    } else if (ctx->T_NOT()) {
+        // 处理逻辑非
+        ast_node * expr_node = std::any_cast<ast_node *>(visitUnaryExp(ctx->unaryExp()));
+        ast_node * not_node = ast_node::New(ast_operator_type::AST_OP_NOT, expr_node, nullptr);
+        return not_node;
     } else {
         return nullptr;
     }

@@ -174,4 +174,46 @@ protected:
     /// @return std::any AST的节点
     ///
     std::any visitExpressionStatement(MiniCParser::ExpressionStatementContext * context) override;
+
+    ///
+    /// @brief 非终结符logicOrExp的遍历
+    /// @param ctx CST上下文
+    /// @return std::any AST的节点
+    ///
+    std::any visitLogicOrExp(MiniCParser::LogicOrExpContext * ctx) override;
+
+    ///
+    /// @brief 非终结符logicAndExp的遍历
+    /// @param ctx CST上下文
+    /// @return std::any AST的节点
+    ///
+    std::any visitLogicAndExp(MiniCParser::LogicAndExpContext * ctx) override;
+
+    ///
+    /// @brief 非终结符equalityExp的遍历
+    /// @param ctx CST上下文
+    /// @return std::any AST的节点
+    ///
+    std::any visitEqualityExp(MiniCParser::EqualityExpContext * ctx) override;
+
+    ///
+    /// @brief 非终结符equalityOp的遍历
+    /// @param ctx CST上下文
+    /// @return std::any 运算符类型
+    ///
+    std::any visitEqualityOp(MiniCParser::EqualityOpContext * ctx) override;
+
+    ///
+    /// @brief 非终结符relationalExp的遍历
+    /// @param ctx CST上下文
+    /// @return std::any AST的节点
+    ///
+    std::any visitRelationalExp(MiniCParser::RelationalExpContext * ctx) override;
+
+    ///
+    /// @brief 非终结符relationalOp的遍历
+    /// @param ctx CST上下文
+    /// @return std::any 运算符类型
+    ///
+    std::any visitRelationalOp(MiniCParser::RelationalOpContext * ctx) override;
 };

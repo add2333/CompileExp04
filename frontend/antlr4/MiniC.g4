@@ -41,8 +41,35 @@ statement:
 	| block								# blockStatement
 	| expr? T_SEMICOLON					# expressionStatement;
 
-// 表达式文法 expr : AddExp 表达式支持加法、减法、乘法、除法和求余运算
-expr: addExp;
+// 表达式文法中遵循以下优先级：从低到高
+// 逻辑或表达式
+// 逻辑与表达式
+// 相等性表达式
+// 关系表达式
+// 加减表达式
+// 乘除模表达式
+// 一元表达式（逻辑非 求负）
+// 基本表达式：括号表达式、整数、左值表达式
+
+expr: logicOrExp;
+
+// 逻辑或表达式
+logicOrExp: logicAndExp (T_OR logicAndExp)*;
+
+// 逻辑与表达式
+logicAndExp: equalityExp (T_AND equalityExp)*;
+
+// 相等性表达式
+equalityExp: relationalExp (equalityOp relationalExp)*;
+
+// 相等性运算符
+equalityOp: T_EQ | T_NE;
+
+// 关系表达式
+relationalExp: addExp (relationalOp addExp)*;
+
+// 关系运算符
+relationalOp: T_LT | T_GT | T_LE | T_GE;
 
 // 加减表达式
 addExp: mulExp (addOp mulExp)*;
@@ -58,6 +85,7 @@ mulOp: T_MUL | T_DIV | T_MOD;
 
 // 一元表达式
 unaryExp: (T_SUB unaryExp)
+	| (T_NOT unaryExp)
 	| primaryExp
 	| T_ID T_L_PAREN realParamList? T_R_PAREN;
 
@@ -80,6 +108,19 @@ T_R_BRACE: '}';
 
 T_ASSIGN: '=';
 T_COMMA: ',';
+
+// 关系运算符
+T_LT: '<';
+T_GT: '>';
+T_LE: '<=';
+T_GE: '>=';
+T_EQ: '==';
+T_NE: '!=';
+
+// 逻辑运算符
+T_AND: '&&';
+T_OR: '||';
+T_NOT: '!';
 
 T_ADD: '+';
 T_SUB: '-';
