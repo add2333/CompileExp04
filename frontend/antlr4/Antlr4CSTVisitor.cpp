@@ -160,6 +160,8 @@ std::any MiniCCSTVisitor::visitStatement(MiniCParser::StatementContext * ctx)
     // 识别的文法产生式：statement: T_ID T_ASSIGN expr T_SEMICOLON  # assignStatement
     // | T_RETURN expr T_SEMICOLON # returnStatement
     // | block  # blockStatement
+    // | T_IF T_L_PAREN expr T_R_PAREN statement (T_ELSE statement)? # ifStatement
+    // | T_WHILE T_L_PAREN expr T_R_PAREN statement # whileStatement
     // | expr ? T_SEMICOLON #expressionStatement;
     if (Instanceof(assignCtx, MiniCParser::AssignStatementContext *, ctx)) {
         return visitAssignStatement(assignCtx);
@@ -167,6 +169,10 @@ std::any MiniCCSTVisitor::visitStatement(MiniCParser::StatementContext * ctx)
         return visitReturnStatement(returnCtx);
     } else if (Instanceof(blockCtx, MiniCParser::BlockStatementContext *, ctx)) {
         return visitBlockStatement(blockCtx);
+    } else if (Instanceof(ifCtx, MiniCParser::IfStatementContext *, ctx)) {
+        return visitIfStatement(ifCtx);
+    } else if (Instanceof(whileCtx, MiniCParser::WhileStatementContext *, ctx)) {
+        return visitWhileStatement(whileCtx);
     } else if (Instanceof(exprCtx, MiniCParser::ExpressionStatementContext *, ctx)) {
         return visitExpressionStatement(exprCtx);
     }
@@ -635,4 +641,51 @@ std::any MiniCCSTVisitor::visitExpressionStatement(MiniCParser::ExpressionStatem
         // 直接返回空指针，需要再把语句加入到语句块时要注意判断，空语句不要加入
         return nullptr;
     }
+}
+
+// ...existing code...
+
+std::any MiniCCSTVisitor::visitIfStatement(MiniCParser::IfStatementContext * ctx)
+{
+    // 识别文法产生式：T_IF T_L_PAREN expr T_R_PAREN statement (T_ELSE statement)?
+
+    // 获取条件表达式
+    ast_node * condExpr = std::any_cast<ast_node *>(visitExpr(ctx->expr()));
+
+    // 获取真分支语句块
+    ast_node * trueBlock = std::any_cast<ast_node *>(visitStatement(ctx->statement(0)));
+
+    // 创建IF节点
+    ast_node * ifNode;
+
+    if (ctx->T_ELSE()) {
+        // 有else分支
+        ast_node * falseBlock = std::any_cast<ast_node *>(visitStatement(ctx->statement(1)));
+
+        // IF节点有三个子节点：条件、真分支、假分支
+        ifNode = ast_node::New(ast_operator_type::AST_OP_IF, condExpr, trueBlock, falseBlock, nullptr);
+    } else {
+        // 没有else分支
+
+        // IF节点有两个子节点：条件、真分支
+        ifNode = ast_node::New(ast_operator_type::AST_OP_IF, condExpr, trueBlock, nullptr);
+    }
+
+    return ifNode;
+}
+
+std::any MiniCCSTVisitor::visitWhileStatement(MiniCParser::WhileStatementContext * ctx)
+{
+    // 识别文法产生式：T_WHILE T_L_PAREN expr T_R_PAREN statement
+
+    // 获取循环条件表达式
+    ast_node * condExpr = std::any_cast<ast_node *>(visitExpr(ctx->expr()));
+
+    // 获取循环体
+    ast_node * bodyBlock = std::any_cast<ast_node *>(visitStatement(ctx->statement()));
+
+    // 创建WHILE节点，有两个子节点：条件、循环体
+    ast_node * whileNode = ast_node::New(ast_operator_type::AST_OP_WHILE, condExpr, bodyBlock, nullptr);
+
+    return whileNode;
 }

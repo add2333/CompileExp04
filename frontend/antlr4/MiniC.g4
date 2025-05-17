@@ -34,22 +34,17 @@ basicType: T_INT;
 // 变量定义
 varDef: T_ID;
 
-// 目前语句支持return和赋值语句
+// 目前语句支持return、赋值、if-else、while语句
 statement:
-	T_RETURN expr T_SEMICOLON			# returnStatement
-	| lVal T_ASSIGN expr T_SEMICOLON	# assignStatement
-	| block								# blockStatement
-	| expr? T_SEMICOLON					# expressionStatement;
+	T_RETURN expr T_SEMICOLON										# returnStatement
+	| lVal T_ASSIGN expr T_SEMICOLON								# assignStatement
+	| block															# blockStatement
+	| T_IF T_L_PAREN expr T_R_PAREN statement (T_ELSE statement)?	# ifStatement
+	| T_WHILE T_L_PAREN expr T_R_PAREN statement					# whileStatement
+	| expr? T_SEMICOLON												# expressionStatement;
 
-// 表达式文法中遵循以下优先级：从低到高
-// 逻辑或表达式
-// 逻辑与表达式
-// 相等性表达式
-// 关系表达式
-// 加减表达式
-// 乘除模表达式
-// 一元表达式（逻辑非 求负）
-// 基本表达式：括号表达式、整数、左值表达式
+// 表达式文法中遵循以下优先级：从低到高 
+// 逻辑或表达式 逻辑与表达式 相等性表达式 关系表达式 加减表达式 乘除模表达式 一元表达式（逻辑非 求负） 基本表达式：括号表达式、整数、左值表达式
 
 expr: logicOrExp;
 
@@ -132,6 +127,9 @@ T_MOD: '%';
 T_RETURN: 'return';
 T_INT: 'int';
 T_VOID: 'void';
+T_IF: 'if';
+T_ELSE: 'else';
+T_WHILE: 'while';
 
 T_ID: [a-zA-Z_][a-zA-Z0-9_]*;
 T_INT_CONST:

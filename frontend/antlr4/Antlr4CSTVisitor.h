@@ -216,4 +216,18 @@ protected:
     /// @return std::any 运算符类型
     ///
     std::any visitRelationalOp(MiniCParser::RelationalOpContext * ctx) override;
+
+    ///
+    /// @brief 非终结符ifStatement的分析
+    /// @param ctx CST上下文
+    /// @return std::any AST的节点
+    ///
+    std::any visitIfStatement(MiniCParser::IfStatementContext * ctx) override;
+
+    ///
+    /// @brief 非终结符whileStatement的分析
+    /// @param ctx CST上下文
+    /// @return std::any AST的节点
+    ///
+    std::any visitWhileStatement(MiniCParser::WhileStatementContext * ctx) override;
 };
