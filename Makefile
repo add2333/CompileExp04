@@ -83,7 +83,7 @@ antlr4:
 	@echo "$(COLOR_OK)[ANTLR] Generated successfully at $(ANTLR_OUT_DIR)$(COLOR_RESET)"
 
 # --- Packaging ---
-package: clean build
+package: build
 	@echo "$(COLOR_INFO)[PACKAGE] Packaging project...$(COLOR_RESET)"
 	cd $(BUILD_DIR) && cpack --config CPackSourceConfig.cmake
 	@echo "$(COLOR_OK)[PACKAGE] Project packaged successfully at $(BUILD_DIR)$(COLOR_RESET)"

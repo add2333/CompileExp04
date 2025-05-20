@@ -20,6 +20,7 @@
 
 #include "AST.h"
 #include "Module.h"
+#include "LabelInstruction.h"
 
 /// @brief AST遍历产生线性IR类
 class IRGenerator {
@@ -141,6 +142,88 @@ protected:
     /// @param node AST节点
     /// @return 成功返回node节点，否则返回nullptr
     ast_node * ir_visit_ast_node(ast_node * node);
+
+    /* Logical operations */
+    /// @brief 逻辑运算节点翻译成线性中间IR，统一调用and、or、not
+    /// @param node AST节点
+    /// @param trueLabel 真出口标签
+    /// @param falseLabel 假出口标签
+    /// @return 翻译是否成功，true：成功，false：失败
+    ast_node * ir_visit_logical_node(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+
+    /// @brief 逻辑与AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @param trueLabel 真出口标签
+    /// @param falseLabel 假出口标签
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_logical_and(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+
+    /// @brief 逻辑或AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @param trueLabel 真出口标签
+    /// @param falseLabel 假出口标签
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_logical_or(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+
+    /// @brief 逻辑非AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @param trueLabel 真出口标签
+    /// @param falseLabel 假出口标签
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_logical_not(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+
+    /* Comparison operations */
+    /// @brief 等于比较AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @param trueLabel 真出口标签
+    /// @param falseLabel 假出口标签
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_equal(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+
+    /// @brief 不等于比较AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @param trueLabel 真出口标签
+    /// @param falseLabel 假出口标签
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_not_equal(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+
+    /// @brief 小于比较AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @param trueLabel 真出口标签
+    /// @param falseLabel 假出口标签
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_less_than(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+
+    /// @brief 小于等于比较AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @param trueLabel 真出口标签
+    /// @param falseLabel 假出口标签
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_less_equal(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+
+    /// @brief 大于比较AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @param trueLabel 真出口标签
+    /// @param falseLabel 假出口标签
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_greater_than(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+
+    /// @brief 大于等于比较AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @param trueLabel 真出口标签
+    /// @param falseLabel 假出口标签
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_greater_equal(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+
+    /// @brief if语句AST节点翻译成线性中间IR (包含处理if-else)
+    /// @param node AST节点
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_if_statement(ast_node * node);
+
+    /// @brief while循环AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_while_statement(ast_node * node);
 
     /// @brief AST的节点操作函数
     typedef bool (IRGenerator::*ast2ir_handler_t)(ast_node *);

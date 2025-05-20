@@ -41,13 +41,13 @@ enum class IRInstOperator : std::int8_t {
     IRINST_OP_SUB_I,
 
     /// @brief 整数的乘法指令，二元运算
-	IRINST_OP_MUL_I,
+    IRINST_OP_MUL_I,
 
-	/// @brief 整数的除法指令，二元运算
-	IRINST_OP_DIV_I,
+    /// @brief 整数的除法指令，二元运算
+    IRINST_OP_DIV_I,
 
-	/// @brief 整数的取余指令，二元运算
-	IRINST_OP_MOD_I,
+    /// @brief 整数的取余指令，二元运算
+    IRINST_OP_MOD_I,
 
     /// @brief 赋值指令，一元运算
     IRINST_OP_ASSIGN,
@@ -59,9 +59,38 @@ enum class IRInstOperator : std::int8_t {
     IRINST_OP_ARG,
 
     /* 后续可追加其他的IR指令 */
-    // TODO: 追加其他IR指令
     /// @brief 整数的求负指令，单目运算
     IRINST_OP_NEG_I,
+
+    /// @brief 条件分支指令
+    IRINST_OP_COND_GOTO,
+
+    /// @brief 逻辑非运算
+    IRINST_OP_LOGICAL_NOT,
+
+    /// @brief 整数等于比较指令
+    IRINST_OP_CMP_EQ_I,
+
+    /// @brief 整数不等于比较指令
+    IRINST_OP_CMP_NE_I,
+
+    /// @brief 整数小于比较指令
+    IRINST_OP_CMP_LT_I,
+
+    /// @brief 整数小于等于比较指令
+    IRINST_OP_CMP_LE_I,
+
+    /// @brief 整数大于比较指令
+    IRINST_OP_CMP_GT_I,
+
+    /// @brief 整数大于等于比较指令
+    IRINST_OP_CMP_GE_I,
+
+    /// @brief if指令
+    IRINST_OP_IF_I,
+
+    /// @brief while指令
+    IRINST_OP_WHILE_I,
 
     /// @brief 最大指令码，也是无效指令
     IRINST_OP_MAX

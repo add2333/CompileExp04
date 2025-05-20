@@ -25,6 +25,7 @@ class UnaryInstruction : public Instruction {
 
 public:
     /// @brief 构造函数
+    /// @param _func 所属函数
     /// @param _op 操作符
     /// @param _result 结果操作数
     /// @param _srcVal1 源操作数1

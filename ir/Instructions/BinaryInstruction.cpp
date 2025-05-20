@@ -61,6 +61,24 @@ void BinaryInstruction::toString(std::string & str)
             str = getIRName() + " = mod " + src1->getIRName() + "," + src2->getIRName();
             break;
 
+        case IRInstOperator::IRINST_OP_CMP_LT_I:
+            str = getIRName() + " = icmp lt " + src1->getIRName() + ", " + src2->getIRName();
+            break;
+        case IRInstOperator::IRINST_OP_CMP_LE_I:
+            str = getIRName() + " = icmp le " + src1->getIRName() + ", " + src2->getIRName();
+            break;
+        case IRInstOperator::IRINST_OP_CMP_GT_I:
+            str = getIRName() + " = icmp gt " + src1->getIRName() + ", " + src2->getIRName();
+            break;
+        case IRInstOperator::IRINST_OP_CMP_GE_I:
+            str = getIRName() + " = icmp ge " + src1->getIRName() + ", " + src2->getIRName();
+            break;
+        case IRInstOperator::IRINST_OP_CMP_EQ_I:
+            str = getIRName() + " = icmp eq " + src1->getIRName() + ", " + src2->getIRName();
+            break;
+        case IRInstOperator::IRINST_OP_CMP_NE_I:
+            str = getIRName() + " = icmp ne " + src1->getIRName() + ", " + src2->getIRName();
+            break;
         default:
             // 未知指令
             Instruction::toString(str);
