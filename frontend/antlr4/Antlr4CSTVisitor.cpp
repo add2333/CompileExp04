@@ -534,8 +534,10 @@ std::any MiniCCSTVisitor::visitPrimaryExp(MiniCParser::PrimaryExpContext * ctx)
         // 无符号整型字面量
         // stoull 函数基数：0（自动）、8（八进制）、10（十进制）、16（十六进制）
         std::string intText = ctx->T_INT_CONST()->getText();
-        uint32_t val = (uint32_t) std::stoull(intText, nullptr, 0);
+        uint32_t val = (uint32_t) stoull(intText, nullptr, 0);
         int64_t lineNo = (int64_t) ctx->T_INT_CONST()->getSymbol()->getLine();
+        // 识别 primaryExp: T_DIGIT
+
         node = ast_node::New(digit_int_attr{val, lineNo});
     } else if (ctx->lVal()) {
         // 具有左值的表达式
