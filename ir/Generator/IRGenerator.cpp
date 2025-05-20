@@ -1259,19 +1259,16 @@ bool IRGenerator::ir_while_statement(ast_node * node)
     ast_node * condNode = node->sons[0];
     ast_node * bodyNode = node->sons[1];
 
-    // 创建标签
-    LabelInstruction * condLabel = new LabelInstruction(currentFunc);
-    LabelInstruction * bodyLabel = new LabelInstruction(currentFunc);
-    LabelInstruction * endWhileLabel = new LabelInstruction(currentFunc);
+    // 创建三个标签：循环入口(L1)、循环体入口(L2)、循环出口(L3)
+    LabelInstruction * loopEntryLabel = new LabelInstruction(currentFunc); // L1
+    LabelInstruction * loopBodyLabel = new LabelInstruction(currentFunc);  // L2
+    LabelInstruction * loopExitLabel = new LabelInstruction(currentFunc);  // L3
 
-    // 无条件跳转到条件判断
-    node->blockInsts.addInst(new GotoInstruction(currentFunc, condLabel));
+    // 插入循环入口标签 (L1)
+    node->blockInsts.addInst(loopEntryLabel);
 
-    // 条件判断标签
-    node->blockInsts.addInst(condLabel);
-
-    // 计算条件表达式
-    ast_node * condition = ir_visit_ast_node(condNode);
+    // 遍历条件表达式，生成线性IR
+    ast_node * condition = ir_visit_logical_node(condNode, loopBodyLabel, loopExitLabel);
     if (!condition) {
         return false;
     }
@@ -1279,13 +1276,10 @@ bool IRGenerator::ir_while_statement(ast_node * node)
     // 保存条件表达式的指令
     node->blockInsts.addInst(condition->blockInsts);
 
-    // 条件跳转：如果条件为真，跳转到循环体；否则跳转到循环结束
-    node->blockInsts.addInst(new CondGotoInstruction(currentFunc, condition->val, bodyLabel, endWhileLabel));
+    // 插入循环体入口标签 (L2)
+    node->blockInsts.addInst(loopBodyLabel);
 
-    // 循环体标签
-    node->blockInsts.addInst(bodyLabel);
-
-    // 处理循环体
+    // 遍历循环体，生成线性IR
     ast_node * bodyResult = ir_visit_ast_node(bodyNode);
     if (!bodyResult) {
         return false;
@@ -1294,11 +1288,11 @@ bool IRGenerator::ir_while_statement(ast_node * node)
     // 保存循环体的指令
     node->blockInsts.addInst(bodyResult->blockInsts);
 
-    // 循环体执行完后，无条件跳转到条件判断
-    node->blockInsts.addInst(new GotoInstruction(currentFunc, condLabel));
+    // 创建并插入无条件跳转指令，目标为循环入口 (L1)
+    node->blockInsts.addInst(new GotoInstruction(currentFunc, loopEntryLabel));
 
-    // 循环结束标签
-    node->blockInsts.addInst(endWhileLabel);
+    // 插入循环出口标签 (L3)
+    node->blockInsts.addInst(loopExitLabel);
 
     return true;
 }

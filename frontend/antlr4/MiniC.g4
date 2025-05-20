@@ -143,3 +143,6 @@ fragment DEC_INT: '0' | [1-9] [0-9]*;
 
 /* 空白符丢弃 */
 WS: [ \r\n\t]+ -> skip;
+
+// 行注释规则
+LINE_COMMENT: '//' ~[\r\n]* -> skip;
