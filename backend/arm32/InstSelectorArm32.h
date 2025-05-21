@@ -80,17 +80,17 @@ protected:
     /// @param inst IR指令
     void translate_neg_int32(Instruction * inst);
 
-	/// @brief 整数乘法指令翻译成ARM32汇编
-	/// @param inst IR指令
-	void translate_mul_int32(Instruction * inst);
+    /// @brief 整数乘法指令翻译成ARM32汇编
+    /// @param inst IR指令
+    void translate_mul_int32(Instruction * inst);
 
-	/// @brief 整数除法指令翻译成ARM32汇编
-	/// @param inst IR指令
-	void translate_div_int32(Instruction * inst);
+    /// @brief 整数除法指令翻译成ARM32汇编
+    /// @param inst IR指令
+    void translate_div_int32(Instruction * inst);
 
-	/// @brief 整数取模指令翻译成ARM32汇编
-	/// @param inst IR指令
-	void translate_mod_int32(Instruction * inst);
+    /// @brief 整数取模指令翻译成ARM32汇编
+    /// @param inst IR指令
+    void translate_mod_int32(Instruction * inst);
 
     /// @brief 单目操作指令翻译成ARM32汇编
     /// @param inst IR指令
@@ -113,6 +113,14 @@ protected:
     void translate_arg(Instruction * inst);
 
     // TODO: 之后可以在这里增加操作指令
+
+    /// @brief 比较指令翻译成ARM32汇编
+    /// @param inst IR指令
+    void translate_cmp(Instruction * inst);
+
+    /// @brief 条件跳转指令翻译成ARM32汇编
+    /// @param inst IR指令
+    void translate_cond_goto(Instruction * inst);
 
     ///
     /// @brief 输出IR指令

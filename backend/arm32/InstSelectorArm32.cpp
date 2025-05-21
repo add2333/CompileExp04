@@ -27,6 +27,7 @@
 
 #include "LabelInstruction.h"
 #include "GotoInstruction.h"
+#include "CondGotoInstruction.h"
 #include "FuncCallInstruction.h"
 #include "MoveInstruction.h"
 #include "Value.h"
@@ -55,6 +56,15 @@ InstSelectorArm32::InstSelectorArm32(vector<Instruction *> & _irCode,
 	translator_handlers[IRInstOperator::IRINST_OP_MUL_I] = &InstSelectorArm32::translate_mul_int32;
 	translator_handlers[IRInstOperator::IRINST_OP_DIV_I] = &InstSelectorArm32::translate_div_int32;
 	translator_handlers[IRInstOperator::IRINST_OP_MOD_I] = &InstSelectorArm32::translate_mod_int32;
+
+    translator_handlers[IRInstOperator::IRINST_OP_CMP_EQ_I] = &InstSelectorArm32::translate_cmp;
+    translator_handlers[IRInstOperator::IRINST_OP_CMP_NE_I] = &InstSelectorArm32::translate_cmp;
+    translator_handlers[IRInstOperator::IRINST_OP_CMP_LT_I] = &InstSelectorArm32::translate_cmp;
+    translator_handlers[IRInstOperator::IRINST_OP_CMP_LE_I] = &InstSelectorArm32::translate_cmp;
+    translator_handlers[IRInstOperator::IRINST_OP_CMP_GT_I] = &InstSelectorArm32::translate_cmp;
+    translator_handlers[IRInstOperator::IRINST_OP_CMP_GE_I] = &InstSelectorArm32::translate_cmp;
+
+    translator_handlers[IRInstOperator::IRINST_OP_COND_GOTO] = &InstSelectorArm32::translate_cond_goto;
 
     translator_handlers[IRInstOperator::IRINST_OP_FUNC_CALL] = &InstSelectorArm32::translate_call;
     translator_handlers[IRInstOperator::IRINST_OP_ARG] = &InstSelectorArm32::translate_arg;
@@ -574,4 +584,108 @@ void InstSelectorArm32::translate_arg(Instruction * inst)
     }
 
     realArgCount++;
+}
+
+/// @brief 比较指令翻译成ARM32汇编
+/// @param inst IR指令
+void InstSelectorArm32::translate_cmp(Instruction * inst)
+{
+    Value * result = inst;              // 比较结果
+    Value * arg1 = inst->getOperand(0); // 左操作数
+    Value * arg2 = inst->getOperand(1); // 右操作数
+
+    int32_t arg1_reg_no = arg1->getRegId();
+    int32_t arg2_reg_no = arg2->getRegId();
+    int32_t result_reg_no = result->getRegId();
+
+    // 加载arg1到寄存器
+    if (arg1_reg_no == -1) {
+        arg1_reg_no = simpleRegisterAllocator.Allocate(arg1);
+        iloc.load_var(arg1_reg_no, arg1);
+    }
+
+    // 加载arg2到寄存器
+    if (arg2_reg_no == -1) {
+        arg2_reg_no = simpleRegisterAllocator.Allocate(arg2);
+        iloc.load_var(arg2_reg_no, arg2);
+    }
+
+    // 确保结果有寄存器
+    if (result_reg_no == -1) {
+        result_reg_no = simpleRegisterAllocator.Allocate(result);
+    }
+
+    // 生成比较指令
+    iloc.inst("cmp", PlatformArm32::regName[arg1_reg_no], PlatformArm32::regName[arg2_reg_no]);
+
+    // 确定条件代码
+    std::string cond;
+    switch (inst->getOp()) {
+        case IRInstOperator::IRINST_OP_CMP_EQ_I:
+            cond = "eq";
+            break; // 等于
+        case IRInstOperator::IRINST_OP_CMP_NE_I:
+            cond = "ne";
+            break; // 不等于
+        case IRInstOperator::IRINST_OP_CMP_LT_I:
+            cond = "lt";
+            break; // 小于
+        case IRInstOperator::IRINST_OP_CMP_LE_I:
+            cond = "le";
+            break; // 小于等于
+        case IRInstOperator::IRINST_OP_CMP_GT_I:
+            cond = "gt";
+            break; // 大于
+        case IRInstOperator::IRINST_OP_CMP_GE_I:
+            cond = "ge";
+            break; // 大于等于
+        default:
+            printf("不支持的比较运算符\n");
+            return;
+    }
+
+    // 先将结果设为0（假）
+    iloc.inst("mov", PlatformArm32::regName[result_reg_no], "#0");
+
+    // 仅当条件满足时，设为1（真）
+    iloc.inst("mov" + cond, PlatformArm32::regName[result_reg_no], "#1");
+
+    // 如果结果不是寄存器变量，则存回内存
+    if (result->getRegId() == -1) {
+        iloc.store_var(result_reg_no, result, ARM32_TMP_REG_NO);
+    }
+
+    // 释放寄存器
+    simpleRegisterAllocator.free(arg1);
+    simpleRegisterAllocator.free(arg2);
+    simpleRegisterAllocator.free(result);
+}
+
+/// @brief 条件跳转指令翻译成ARM32汇编
+/// @param inst IR指令
+void InstSelectorArm32::translate_cond_goto(Instruction * inst)
+{
+    CondGotoInstruction * condGotoInst = dynamic_cast<CondGotoInstruction *>(inst);
+
+    Value * condVar = condGotoInst->getCondVar();                    // 条件变量
+    LabelInstruction * trueTarget = condGotoInst->getTrueTarget();   // 真跳转目标
+    LabelInstruction * falseTarget = condGotoInst->getFalseTarget(); // 假跳转目标
+
+    int32_t cond_reg_no = condVar->getRegId();
+
+    // 加载条件变量到寄存器
+    if (cond_reg_no == -1) {
+        cond_reg_no = simpleRegisterAllocator.Allocate(condVar);
+        iloc.load_var(cond_reg_no, condVar);
+    }
+
+    // 生成比较指令
+    iloc.inst("cmp", PlatformArm32::regName[cond_reg_no], "#0");
+
+    // 生成条件跳转指令
+    iloc.inst("bne", trueTarget->getName()); // 条件为真跳转
+    iloc.inst("b", falseTarget->getName());  // 条件为假跳转
+
+    // 释放寄存器
+    simpleRegisterAllocator.free(condVar);
 }

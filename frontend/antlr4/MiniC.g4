@@ -41,10 +41,11 @@ statement:
 	| block															# blockStatement
 	| T_IF T_L_PAREN expr T_R_PAREN statement (T_ELSE statement)?	# ifStatement
 	| T_WHILE T_L_PAREN expr T_R_PAREN statement					# whileStatement
+	| T_BREAK T_SEMICOLON											# breakStatement
+	| T_CONTINUE T_SEMICOLON										# continueStatement
 	| expr? T_SEMICOLON												# expressionStatement;
 
-// 表达式文法中遵循以下优先级：从低到高 
-// 逻辑或表达式 逻辑与表达式 相等性表达式 关系表达式 加减表达式 乘除模表达式 一元表达式（逻辑非 求负） 基本表达式：括号表达式、整数、左值表达式
+// 表达式文法中遵循以下优先级：从低到高 逻辑或表达式 逻辑与表达式 相等性表达式 关系表达式 加减表达式 乘除模表达式 一元表达式（逻辑非 求负） 基本表达式：括号表达式、整数、左值表达式
 
 expr: logicOrExp;
 
@@ -130,6 +131,8 @@ T_VOID: 'void';
 T_IF: 'if';
 T_ELSE: 'else';
 T_WHILE: 'while';
+T_BREAK: 'break';
+T_CONTINUE: 'continue';
 
 T_ID: [a-zA-Z_][a-zA-Z0-9_]*;
 T_INT_CONST:

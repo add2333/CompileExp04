@@ -14,6 +14,7 @@
 /// <tr><td>2024-11-23 <td>1.1     <td>zenglj  <td>表达式版增强
 /// </table>
 ///
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <stdexcept>
@@ -25,6 +26,7 @@
 #include "Function.h"
 #include "IRCode.h"
 #include "IRGenerator.h"
+#include "IntegerType.h"
 #include "Module.h"
 #include "EntryInstruction.h"
 #include "LabelInstruction.h"
@@ -58,6 +60,8 @@ IRGenerator::IRGenerator(ast_node * _root, Module * _module) : root(_root), modu
     /* 控制流语句 */
     ast2ir_handlers[ast_operator_type::AST_OP_IF] = &IRGenerator::ir_if_statement;
     ast2ir_handlers[ast_operator_type::AST_OP_WHILE] = &IRGenerator::ir_while_statement;
+    ast2ir_handlers[ast_operator_type::AST_OP_BREAK] = &IRGenerator::ir_break_statement;
+    ast2ir_handlers[ast_operator_type::AST_OP_CONTINUE] = &IRGenerator::ir_continue_statement;
 
     /* 语句 */
     ast2ir_handlers[ast_operator_type::AST_OP_ASSIGN] = &IRGenerator::ir_assign;
@@ -114,6 +118,64 @@ ast_node * IRGenerator::ir_visit_ast_node(ast_node * node)
         result = (this->ir_default)(node);
     } else {
         result = (this->*(pIter->second))(node);
+    }
+
+    if (!result) {
+        // 语义解析错误，则出错返回
+        node = nullptr;
+    }
+
+    return node;
+}
+
+/// @brief 调用需要两个标签的节点处理
+/// @param node AST节点
+/// @param trueLabel 真出口标签
+/// @param falseLabel 假出口标签
+/// @return 成功返回node节点，否则返回nullptr
+ast_node * IRGenerator::ir_visit_ast_node_with_2_labels(ast_node * node,
+                                                        LabelInstruction * trueLabel,
+                                                        LabelInstruction * falseLabel)
+{
+    bool result = false;
+
+    switch (node->node_type) {
+        case ast_operator_type::AST_OP_AND:
+            result = ir_logical_and(node, trueLabel, falseLabel);
+            break;
+        case ast_operator_type::AST_OP_OR:
+            result = ir_logical_or(node, trueLabel, falseLabel);
+            break;
+        case ast_operator_type::AST_OP_NOT:
+            result = ir_logical_not(node, trueLabel, falseLabel);
+            break;
+
+        // 添加对关系表达式的支持
+        case ast_operator_type::AST_OP_EQ:
+            result = ir_equal(node, trueLabel, falseLabel);
+            break;
+        case ast_operator_type::AST_OP_NE:
+            result = ir_not_equal(node, trueLabel, falseLabel);
+            break;
+        case ast_operator_type::AST_OP_LT:
+            result = ir_less_than(node, trueLabel, falseLabel);
+            break;
+        case ast_operator_type::AST_OP_LE:
+            result = ir_less_equal(node, trueLabel, falseLabel);
+            break;
+        case ast_operator_type::AST_OP_GT:
+            result = ir_greater_than(node, trueLabel, falseLabel);
+            break;
+        case ast_operator_type::AST_OP_GE:
+            result = ir_greater_equal(node, trueLabel, falseLabel);
+            break;
+        case ast_operator_type::AST_OP_NEG:
+            result = ir_neg(node, trueLabel, falseLabel);
+            break;
+        default:
+            // 如果不是逻辑或关系表达式，调用默认处理函数
+            result = ir_visit_ast_node(node);
+            break;
     }
 
     if (!result) {
@@ -496,6 +558,36 @@ bool IRGenerator::ir_neg(ast_node * node)
     return true;
 }
 
+/// @brief 布尔类型单目运算符（求负）AST节点翻译成线性中间IR
+/// @param node AST节点
+/// @param trueLabel 真出口标签
+/// @param falseLabel 假出口标签
+/// @return 翻译是否成功，true：成功，false：失败
+bool IRGenerator::ir_neg(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel)
+{
+    ast_node * src1_node = node->sons[0];
+
+    // 操作数
+    ast_node * right = ir_visit_ast_node_with_2_labels(src1_node, trueLabel, falseLabel);
+    if (!right) {
+        // 某个变量没有定值
+        return false;
+    }
+
+    // // 处理布尔类数据
+    // UnaryInstruction * negInst = new UnaryInstruction(module->getCurrentFunction(),
+    //                                                   IRInstOperator::IRINST_OP_NEG_I,
+    //                                                   right->val,
+    //                                                   IntegerType::getTypeBool());
+
+    // 创建临时变量保存IR的值，以及线性IR指令
+    node->blockInsts.addInst(right->blockInsts);
+
+    // node->val = negInst;
+
+    return true;
+}
+
 /// @brief 整数乘法AST节点翻译成线性中间IR
 /// @param node AST节点
 /// @return 翻译是否成功，true：成功，false：失败
@@ -782,62 +874,6 @@ bool IRGenerator::ir_variable_declare(ast_node * node)
     return true;
 }
 
-/// @brief 逻辑运算节点翻译成线性中间IR，统一调用and、or、not或关系表达式
-/// @param node AST节点
-/// @param trueLabel 真出口标签
-/// @param falseLabel 假出口标签
-/// @return 成功返回node节点，否则返回nullptr
-ast_node *
-IRGenerator::ir_visit_logical_node(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel)
-{
-    bool result = false;
-
-    switch (node->node_type) {
-        case ast_operator_type::AST_OP_AND:
-            result = ir_logical_and(node, trueLabel, falseLabel);
-            break;
-        case ast_operator_type::AST_OP_OR:
-            result = ir_logical_or(node, trueLabel, falseLabel);
-            break;
-        case ast_operator_type::AST_OP_NOT:
-            result = ir_logical_not(node, trueLabel, falseLabel);
-            break;
-
-        // 添加对关系表达式的支持
-        case ast_operator_type::AST_OP_EQ:
-            result = ir_equal(node, trueLabel, falseLabel);
-            break;
-        case ast_operator_type::AST_OP_NE:
-            result = ir_not_equal(node, trueLabel, falseLabel);
-            break;
-        case ast_operator_type::AST_OP_LT:
-            result = ir_less_than(node, trueLabel, falseLabel);
-            break;
-        case ast_operator_type::AST_OP_LE:
-            result = ir_less_equal(node, trueLabel, falseLabel);
-            break;
-        case ast_operator_type::AST_OP_GT:
-            result = ir_greater_than(node, trueLabel, falseLabel);
-            break;
-        case ast_operator_type::AST_OP_GE:
-            result = ir_greater_equal(node, trueLabel, falseLabel);
-            break;
-
-        default:
-            // 如果不是逻辑或关系表达式，调用默认处理
-            printf("Not a logical or relational node(%d)\n", (int) node->node_type);
-            result = ir_visit_ast_node(node);
-            break;
-    }
-
-    if (!result) {
-        // 语义解析错误，则出错返回
-        node = nullptr;
-    }
-
-    return node;
-}
-
 /// @brief 逻辑与AST节点翻译成线性中间IR
 /// @param node AST节点
 /// @param trueLabel 真出口标签
@@ -851,7 +887,7 @@ bool IRGenerator::ir_logical_and(ast_node * node, LabelInstruction * trueLabel, 
     // 条件分支: 如果左操作数为假(0)，直接跳转到假出口
     // 如果左操作数为真(非0)，继续计算右操作数
     LabelInstruction * rightOperandLabel = new LabelInstruction(currentFunc);
-    ast_node * left = ir_visit_logical_node(node->sons[0], rightOperandLabel, falseLabel);
+    ast_node * left = ir_visit_ast_node_with_2_labels(node->sons[0], rightOperandLabel, falseLabel);
     if (!left) {
         return false;
     }
@@ -863,7 +899,7 @@ bool IRGenerator::ir_logical_and(ast_node * node, LabelInstruction * trueLabel, 
     node->blockInsts.addInst(rightOperandLabel);
 
     // 计算右操作数
-    ast_node * right = ir_visit_logical_node(node->sons[1], trueLabel, falseLabel);
+    ast_node * right = ir_visit_ast_node_with_2_labels(node->sons[1], trueLabel, falseLabel);
     if (!right) {
         return false;
     }
@@ -887,7 +923,7 @@ bool IRGenerator::ir_logical_or(ast_node * node, LabelInstruction * trueLabel, L
     // 条件分支: 如果左操作数为真(非0)，直接跳转到真出口
     // 如果左操作数为假(0)，继续计算右操作数
     LabelInstruction * rightOperandLabel = new LabelInstruction(currentFunc);
-    ast_node * left = ir_visit_logical_node(node->sons[0], trueLabel, rightOperandLabel);
+    ast_node * left = ir_visit_ast_node_with_2_labels(node->sons[0], trueLabel, rightOperandLabel);
     if (!left) {
         return false;
     }
@@ -899,7 +935,7 @@ bool IRGenerator::ir_logical_or(ast_node * node, LabelInstruction * trueLabel, L
     node->blockInsts.addInst(rightOperandLabel);
 
     // 计算右操作数
-    ast_node * right = ir_visit_logical_node(node->sons[1], trueLabel, falseLabel);
+    ast_node * right = ir_visit_ast_node_with_2_labels(node->sons[1], trueLabel, falseLabel);
     if (!right) {
         return false;
     }
@@ -919,8 +955,35 @@ bool IRGenerator::ir_logical_not(ast_node * node, LabelInstruction * trueLabel, 
 {
     // Function * currentFunc = module->getCurrentFunction();
 
+    // 如果子节点为常量或变量，则将变量转换为布尔值，并直接保存指令返回
+    if (node->sons[0]->isLeafNode()) {
+        // 计算左操作数
+        ast_node * left = ir_visit_ast_node(node->sons[0]);
+        if (!left) {
+            return false;
+        }
+        // 保存左操作数的指令
+        node->blockInsts.addInst(left->blockInsts);
+        // 创建比较指令
+        Value * boolZero = module->newConstInt(0);
+        BinaryInstruction * cmpInst = new BinaryInstruction(module->getCurrentFunction(),
+                                                            IRInstOperator::IRINST_OP_CMP_EQ_I,
+                                                            left->val,
+                                                            boolZero,
+                                                            IntegerType::getTypeBool());
+        // 保存比较指令
+        node->blockInsts.addInst(cmpInst);
+
+        // 创建条件跳转指令
+        CondGotoInstruction * condGotoInst =
+            new CondGotoInstruction(module->getCurrentFunction(), cmpInst, trueLabel, falseLabel);
+        // 保存条件跳转指令
+        node->blockInsts.addInst(condGotoInst);
+        return true;
+    }
+
     // 计算操作数
-    ast_node * operand = ir_visit_logical_node(node->sons[0], falseLabel, trueLabel);
+    ast_node * operand = ir_visit_ast_node_with_2_labels(node->sons[0], falseLabel, trueLabel);
     if (!operand) {
         return false;
     }
@@ -1213,7 +1276,7 @@ bool IRGenerator::ir_if_statement(ast_node * node)
     LabelInstruction * endIfLabel = new LabelInstruction(currentFunc);
 
     // 计算条件表达式
-    ast_node * condition = ir_visit_logical_node(condNode, thenLabel, hasElse ? elseLabel : endIfLabel);
+    ast_node * condition = ir_visit_ast_node_with_2_labels(condNode, thenLabel, hasElse ? elseLabel : endIfLabel);
     if (!condition) {
         return false;
     }
@@ -1248,9 +1311,6 @@ bool IRGenerator::ir_if_statement(ast_node * node)
     return true;
 }
 
-/// @brief while循环AST节点翻译成线性中间IR
-/// @param node AST节点
-/// @return 翻译是否成功，true：成功，false：失败
 bool IRGenerator::ir_while_statement(ast_node * node)
 {
     Function * currentFunc = module->getCurrentFunction();
@@ -1264,11 +1324,15 @@ bool IRGenerator::ir_while_statement(ast_node * node)
     LabelInstruction * loopBodyLabel = new LabelInstruction(currentFunc);  // L2
     LabelInstruction * loopExitLabel = new LabelInstruction(currentFunc);  // L3
 
+    // 将标签压入栈
+    currentFunc->pushBreakLabel(loopExitLabel);
+    currentFunc->pushContinueLabel(loopEntryLabel);
+
     // 插入循环入口标签 (L1)
     node->blockInsts.addInst(loopEntryLabel);
 
     // 遍历条件表达式，生成线性IR
-    ast_node * condition = ir_visit_logical_node(condNode, loopBodyLabel, loopExitLabel);
+    ast_node * condition = ir_visit_ast_node_with_2_labels(condNode, loopBodyLabel, loopExitLabel);
     if (!condition) {
         return false;
     }
@@ -1280,7 +1344,7 @@ bool IRGenerator::ir_while_statement(ast_node * node)
     node->blockInsts.addInst(loopBodyLabel);
 
     // 遍历循环体，生成线性IR
-    ast_node * bodyResult = ir_visit_ast_node(bodyNode);
+    ast_node * bodyResult = ir_visit_ast_node_with_2_labels(bodyNode, loopEntryLabel, loopExitLabel);
     if (!bodyResult) {
         return false;
     }
@@ -1293,6 +1357,50 @@ bool IRGenerator::ir_while_statement(ast_node * node)
 
     // 插入循环出口标签 (L3)
     node->blockInsts.addInst(loopExitLabel);
+
+    // 弹出标签
+    currentFunc->popBreakLabel();
+    currentFunc->popContinueLabel();
+
+    return true;
+}
+
+/// @brief break语句AST节点翻译成线性中间IR
+/// @param node AST节点
+/// @return 翻译是否成功，true：成功，false：失败
+bool IRGenerator::ir_break_statement(ast_node * node)
+{
+    Function * currentFunc = module->getCurrentFunction();
+
+    // 获取当前的break跳转标签
+    LabelInstruction * breakLabel = currentFunc->getBreakLabel();
+    if (!breakLabel) {
+        minic_log(LOG_ERROR, "break语句必须在循环中使用");
+        return false;
+    }
+
+    // 创建无条件跳转指令到循环出口
+    node->blockInsts.addInst(new GotoInstruction(currentFunc, breakLabel));
+
+    return true;
+}
+
+/// @brief continue语句AST节点翻译成线性中间IR
+/// @param node AST节点
+/// @return 翻译是否成功，true：成功，false：失败
+bool IRGenerator::ir_continue_statement(ast_node * node)
+{
+    Function * currentFunc = module->getCurrentFunction();
+
+    // 获取当前的continue跳转标签
+    LabelInstruction * continueLabel = currentFunc->getContinueLabel();
+    if (!continueLabel) {
+        minic_log(LOG_ERROR, "continue语句必须在循环中使用");
+        return false;
+    }
+
+    // 创建无条件跳转指令到循环入口
+    node->blockInsts.addInst(new GotoInstruction(currentFunc, continueLabel));
 
     return true;
 }

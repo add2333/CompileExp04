@@ -15,12 +15,14 @@
 ///
 #pragma once
 
+#include <stack>
 #include <string>
 #include <vector>
 
 #include "GlobalValue.h"
 #include "FunctionType.h"
 #include "FormalParam.h"
+#include "LabelInstruction.h"
 #include "LocalVariable.h"
 #include "MemVariable.h"
 #include "IRCode.h"
@@ -146,6 +148,7 @@ public:
     /// \return 临时变量Value
     MemVariable * newMemVariable(Type * type);
 
+
     /// @brief 清理函数内申请的资源
     void Delete();
 
@@ -169,6 +172,28 @@ public:
     /// @brief 用于统计ARG指令个数的清零
     ///
     void realArgCountReset();
+
+    /// @brief 压入break跳转标签
+    /// @param label 跳转标签
+    void pushBreakLabel(LabelInstruction * label);
+
+    /// @brief 弹出break跳转标签
+    void popBreakLabel();
+
+    /// @brief 获取当前break跳转标签
+    /// @return 当前break跳转标签
+    LabelInstruction * getBreakLabel();
+
+    /// @brief 压入continue跳转标签
+    /// @param label 跳转标签
+    void pushContinueLabel(LabelInstruction * label);
+
+    /// @brief 弹出continue跳转标签
+    void popContinueLabel();
+
+    /// @brief 获取当前continue跳转标签
+    /// @return 当前continue跳转标签
+    LabelInstruction * getContinueLabel();
 
 private:
     ///
@@ -250,4 +275,11 @@ private:
     /// @brief 累计的实参个数，用于ARG指令的统计
     ///
     int32_t realArgCount = 0;
+
+    /// @brief 保存break跳转标签的栈
+    std::stack<LabelInstruction *> breakLabelStack;
+
+    /// @brief 保存continue跳转标签的栈
+    std::stack<LabelInstruction *> continueLabelStack;
+
 };

@@ -47,7 +47,7 @@ runms:
 	@echo "$(COLOR_INFO)[MINIC] Generating .s...$(COLOR_RESET)"
 	$(MINIC_EXE) -S -A -o ./tests/asm/$(ARGS).s ./tests/$(ARGS).c
 
-runmc:
+runmc: runms
 	@echo "$(COLOR_INFO)[MINIC] Generating executable...$(COLOR_RESET)"
 	arm-linux-gnueabihf-gcc -static -g -o ./tests/exec/$(ARGS) ./tests/asm/$(ARGS).s ./tests/asm/std.s
 

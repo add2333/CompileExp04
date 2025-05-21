@@ -78,10 +78,17 @@ protected:
     /// @return 翻译是否成功，true：成功，false：失败
     bool ir_neg(ast_node * node);
 
-    /// @brief 整数乘法AST节点翻译成线性中间IR
+    /// @brief 布尔类型单目运算符（求负）AST节点翻译成线性中间IR
     /// @param node AST节点
+    /// @param trueLabel 真出口标签
+    /// @param falseLabel 假出口标签
     /// @return 翻译是否成功，true：成功，false：失败
-    bool ir_mul(ast_node * node);
+    bool ir_neg(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+
+	/// @brief 整数乘法AST节点翻译成线性中间IR
+	/// @param node AST节点
+	/// @return 翻译是否成功，true：成功，false：失败
+	bool ir_mul(ast_node * node);
 
     /// @brief 整数除法AST节点翻译成线性中间IR
     /// @param node AST节点
@@ -143,13 +150,13 @@ protected:
     /// @return 成功返回node节点，否则返回nullptr
     ast_node * ir_visit_ast_node(ast_node * node);
 
-    /* Logical operations */
-    /// @brief 逻辑运算节点翻译成线性中间IR，统一调用and、or、not
+    /// @brief 调用需要两个标签的节点处理
     /// @param node AST节点
     /// @param trueLabel 真出口标签
     /// @param falseLabel 假出口标签
-    /// @return 翻译是否成功，true：成功，false：失败
-    ast_node * ir_visit_logical_node(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+    /// @return 成功返回node节点，否则返回nullptr
+    ast_node *
+    ir_visit_ast_node_with_2_labels(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
 
     /// @brief 逻辑与AST节点翻译成线性中间IR
     /// @param node AST节点
@@ -224,6 +231,16 @@ protected:
     /// @param node AST节点
     /// @return 翻译是否成功，true：成功，false：失败
     bool ir_while_statement(ast_node * node);
+
+    /// @brief break语句AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_break_statement(ast_node * node);
+
+    /// @brief continue语句AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_continue_statement(ast_node * node);
 
     /// @brief AST的节点操作函数
     typedef bool (IRGenerator::*ast2ir_handler_t)(ast_node *);

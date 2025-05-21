@@ -333,3 +333,53 @@ void Function::realArgCountReset()
 {
     this->realArgCount = 0;
 }
+
+/// @brief 压入break跳转标签
+/// @param label 跳转标签
+void Function::pushBreakLabel(LabelInstruction * label)
+{
+    breakLabelStack.push(label);
+}
+
+/// @brief 弹出break跳转标签
+void Function::popBreakLabel()
+{
+    if (!breakLabelStack.empty()) {
+        breakLabelStack.pop();
+    }
+}
+
+/// @brief 获取当前break跳转标签
+/// @return 当前break跳转标签
+LabelInstruction * Function::getBreakLabel()
+{
+    if (!breakLabelStack.empty()) {
+        return breakLabelStack.top();
+    }
+    return nullptr;
+}
+
+/// @brief 压入continue跳转标签
+/// @param label 跳转标签
+void Function::pushContinueLabel(LabelInstruction * label)
+{
+    continueLabelStack.push(label);
+}
+
+/// @brief 弹出continue跳转标签
+void Function::popContinueLabel()
+{
+    if (!continueLabelStack.empty()) {
+        continueLabelStack.pop();
+    }
+}
+
+/// @brief 获取当前continue跳转标签
+/// @return 当前continue跳转标签
+LabelInstruction * Function::getContinueLabel()
+{
+    if (!continueLabelStack.empty()) {
+        return continueLabelStack.top();
+    }
+    return nullptr;
+}

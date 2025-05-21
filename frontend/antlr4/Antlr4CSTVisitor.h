@@ -230,4 +230,14 @@ protected:
     /// @return std::any AST的节点
     ///
     std::any visitWhileStatement(MiniCParser::WhileStatementContext * ctx) override;
+
+    /// @brief 非终结符breakStatement的分析
+    /// @param ctx CST上下文
+    /// @return std::any AST的节点
+    std::any visitBreakStatement(MiniCParser::BreakStatementContext * ctx) override;
+
+    /// @brief 非终结符continueStatement的分析
+    /// @param ctx CST上下文
+    /// @return std::any AST的节点
+    std::any visitContinueStatement(MiniCParser::ContinueStatementContext * ctx) override;
 };

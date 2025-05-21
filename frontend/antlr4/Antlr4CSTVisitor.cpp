@@ -162,6 +162,8 @@ std::any MiniCCSTVisitor::visitStatement(MiniCParser::StatementContext * ctx)
     // | block  # blockStatement
     // | T_IF T_L_PAREN expr T_R_PAREN statement (T_ELSE statement)? # ifStatement
     // | T_WHILE T_L_PAREN expr T_R_PAREN statement # whileStatement
+    // | T_BREAK T_SEMICOLON # breakStatement
+    // | T_CONTINUE T_SEMICOLON # continueStatement
     // | expr ? T_SEMICOLON #expressionStatement;
     if (Instanceof(assignCtx, MiniCParser::AssignStatementContext *, ctx)) {
         return visitAssignStatement(assignCtx);
@@ -173,6 +175,10 @@ std::any MiniCCSTVisitor::visitStatement(MiniCParser::StatementContext * ctx)
         return visitIfStatement(ifCtx);
     } else if (Instanceof(whileCtx, MiniCParser::WhileStatementContext *, ctx)) {
         return visitWhileStatement(whileCtx);
+    } else if (Instanceof(breakCtx, MiniCParser::BreakStatementContext *, ctx)) {
+        return visitBreakStatement(breakCtx);
+    } else if (Instanceof(continueCtx, MiniCParser::ContinueStatementContext *, ctx)) {
+        return visitContinueStatement(continueCtx);
     } else if (Instanceof(exprCtx, MiniCParser::ExpressionStatementContext *, ctx)) {
         return visitExpressionStatement(exprCtx);
     }
@@ -690,4 +696,20 @@ std::any MiniCCSTVisitor::visitWhileStatement(MiniCParser::WhileStatementContext
     ast_node * whileNode = ast_node::New(ast_operator_type::AST_OP_WHILE, condExpr, bodyBlock, nullptr);
 
     return whileNode;
+}
+
+std::any MiniCCSTVisitor::visitBreakStatement(MiniCParser::BreakStatementContext * ctx)
+{
+    // 识别文法产生式：breakStatement -> T_BREAK T_SEMICOLON
+
+    // 创建BREAK节点
+    return create_contain_node(ast_operator_type::AST_OP_BREAK);
+}
+
+std::any MiniCCSTVisitor::visitContinueStatement(MiniCParser::ContinueStatementContext * ctx)
+{
+    // 识别文法产生式：continueStatement -> T_CONTINUE T_SEMICOLON
+
+    // 创建CONTINUE节点
+    return create_contain_node(ast_operator_type::AST_OP_CONTINUE);
 }
