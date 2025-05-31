@@ -28,6 +28,12 @@ Function::Function(std::string _name, FunctionType * _type, bool _builtin)
     : GlobalValue(_type, _name), builtIn(_builtin)
 {
     returnType = _type->getReturnType();
+    std::vector<Type *> paramTypes = _type->getArgTypes();
+    int i = 0;
+    for (auto & paramType: paramTypes) {
+        i++;
+        params.push_back(new FormalParam(paramType, std::to_string(i)));
+    }
 
     // 设置对齐大小
     setAlignment(1);
@@ -91,7 +97,7 @@ void Function::toString(std::string & str)
             str += ", ";
         }
 
-        std::string param_str = param->getType()->toString() + param->getIRName();
+        std::string param_str = param->getType()->toString() + " " + param->getIRName();
 
         str += param_str;
     }

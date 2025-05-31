@@ -285,11 +285,17 @@ create_func_def(ast_node * type_node, ast_node * name_node, ast_node * block = n
 /// @return 创建的节点
 ast_node * create_func_def(type_attr & type, var_id_attr & id, ast_node * block_node, ast_node * params_node);
 
-/// @brief 创建函数形式参数的节点
-/// @param line_no 行号
-/// @param param_name 形式参数名
-/// @return 创建的节点
-ast_node * create_func_formal_param(uint32_t line_no, const char * param_name);
+// /// @brief 创建函数形式参数的节点
+// /// @param line_no 行号
+// /// @param param_name 形式参数名
+// /// @return 创建的节点
+// ast_node * create_func_formal_param(uint32_t line_no, const char * param_name);
+
+/// @brief 创建函数参数节点
+/// @param type 参数类型
+/// @param name 参数名
+/// @return 创建的参数节点
+ast_node * create_func_param(type_attr & type, var_id_attr & name);
 
 /// @brief 创建函数调用的节点
 /// @param funcname_node 函数名节点

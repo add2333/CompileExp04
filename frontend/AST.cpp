@@ -236,7 +236,7 @@ ast_node * create_func_def(ast_node * type_node, ast_node * name_node, ast_node 
 /// @return 创建的节点
 ast_node * create_func_def(type_attr & type, var_id_attr & id, ast_node * block_node, ast_node * params_node)
 {
-    // 创建整型类型节点的终结符节点
+    // 创建类型节点的终结符节点
     ast_node * type_node = create_type_node(type);
 
     // 创建标识符终结符节点
@@ -247,6 +247,31 @@ ast_node * create_func_def(type_attr & type, var_id_attr & id, ast_node * block_
     id.id = nullptr;
 
     return create_func_def(type_node, id_node, block_node, params_node);
+}
+
+
+/// @brief 创建函数参数节点
+/// @param type 参数类型
+/// @param name 参数名
+/// @return 创建的参数节点
+ast_node * create_func_param(type_attr & type, var_id_attr & name)
+{
+    // 创建类型节点
+    ast_node * type_node = create_type_node(type);
+
+    // 创建参数名节点
+    ast_node * name_node = ast_node::New(name.id, name.lineno);
+
+    // 释放参数名字符串
+    free(name.id);
+    name.id = nullptr;
+
+    // 创建参数节点
+    ast_node * param_node = create_contain_node(ast_operator_type::AST_OP_FUNC_FORMAL_PARAM, type_node, name_node);
+    param_node->type = typeAttr2Type(type);
+    param_node->name = name_node->name;
+
+    return param_node;
 }
 
 /// @brief 创建AST的内部节点

@@ -15,6 +15,7 @@
 /// </table>
 ///
 
+#include <cstddef>
 #include <string>
 
 #include "Antlr4CSTVisitor.h"
@@ -76,25 +77,83 @@ std::any MiniCCSTVisitor::visitCompileUnit(MiniCParser::CompileUnitContext * ctx
 /// @param ctx CST上下文
 std::any MiniCCSTVisitor::visitFuncDef(MiniCParser::FuncDefContext * ctx)
 {
-    // 识别的文法产生式：funcDef : T_INT T_ID T_L_PAREN T_R_PAREN block;
+    // 识别的文法产生式：funcDef: funcType T_ID T_L_PAREN (funcParams | T_VOID)? T_R_PAREN block;
 
-    // 函数返回类型，终结符
-    type_attr funcReturnType{BasicType::TYPE_INT, (int64_t) ctx->T_INT()->getSymbol()->getLine()};
+    // 函数返回类型，非终结符
+    type_attr funcReturnType = std::any_cast<type_attr>(visitFuncType(ctx->funcType()));
 
     // 创建函数名的标识符终结符节点，终结符
     char * id = strdup(ctx->T_ID()->getText().c_str());
-
     var_id_attr funcId{id, (int64_t) ctx->T_ID()->getSymbol()->getLine()};
 
-    // 形参结点目前没有，设置为空指针
+    // 形参结点处理
     ast_node * formalParamsNode = nullptr;
+    if (ctx->funcParams()) {
+        // 有参数列表
+        formalParamsNode = std::any_cast<ast_node *>(visitFuncParams(ctx->funcParams()));
+    } else if (ctx->T_VOID()) {
+        // 显式void参数，formalParamsNode保持nullptr，create_func_def会处理
+        formalParamsNode = nullptr;
+    }
+    // 如果既没有funcParams也没有T_VOID，formalParamsNode保持nullptr，create_func_def会处理
 
     // 遍历block结点创建函数体节点，非终结符
     auto blockNode = std::any_cast<ast_node *>(visitBlock(ctx->block()));
 
-    // 创建函数定义的节点，孩子有类型，函数名，语句块和形参(实际上无)
-    // create_func_def函数内会释放funcId中指向的标识符空间，切记，之后不要再释放，之前一定要是通过strdup函数或者malloc分配的空间
+    // 创建函数定义的节点
     return create_func_def(funcReturnType, funcId, blockNode, formalParamsNode);
+}
+
+/// @brief 非终结运算符funcType的遍历
+/// @param ctx CST上下文
+std::any MiniCCSTVisitor::visitFuncType(MiniCParser::FuncTypeContext * ctx)
+{
+    // 识别的文法产生式：funcType: T_INT | T_VOID;
+    type_attr attr{BasicType::TYPE_VOID, -1};
+
+    if (ctx->T_INT()) {
+        attr.type = BasicType::TYPE_INT;
+        attr.lineno = (int64_t) ctx->T_INT()->getSymbol()->getLine();
+    } else if (ctx->T_VOID()) {
+        attr.type = BasicType::TYPE_VOID;
+        attr.lineno = (int64_t) ctx->T_VOID()->getSymbol()->getLine();
+    }
+
+    return attr;
+}
+
+/// @brief 非终结运算符funcParams的遍历
+/// @param ctx CST上下文
+std::any MiniCCSTVisitor::visitFuncParams(MiniCParser::FuncParamsContext * ctx)
+{
+    // 识别的文法产生式：funcParams: funcParam (T_COMMA funcParam)*;
+
+    auto paramsNode = new ast_node(ast_operator_type::AST_OP_FUNC_FORMAL_PARAMS);
+
+    // 遍历所有参数
+    for (auto paramCtx: ctx->funcParam()) {
+        auto paramNode = std::any_cast<ast_node *>(visitFuncParam(paramCtx));
+        paramsNode->insert_son_node(paramNode);
+    }
+
+    return paramsNode;
+}
+
+/// @brief 非终结运算符funcParam的遍历
+/// @param ctx CST上下文
+std::any MiniCCSTVisitor::visitFuncParam(MiniCParser::FuncParamContext * ctx)
+{
+    // 识别的文法产生式：funcParam: basicType T_ID;
+
+    // 获取参数类型
+    type_attr paramType = std::any_cast<type_attr>(visitBasicType(ctx->basicType()));
+
+    // 获取参数名
+    char * id = strdup(ctx->T_ID()->getText().c_str());
+    var_id_attr paramName{id, (int64_t) ctx->T_ID()->getSymbol()->getLine()};
+
+    // 创建参数节点
+    return create_func_param(paramType, paramName);
 }
 
 /// @brief 非终结运算符block的遍历

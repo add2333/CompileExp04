@@ -30,7 +30,7 @@
 ///
 /// @brief 描述函数信息的类，是全局静态存储，其Value的类型为FunctionType
 ///
-class Function : public GlobalValue {
+class 	Function : public GlobalValue {
 
 public:
     /// @brief 指定函数名字、函数返回类型以及函数形式参数的构造函数

@@ -14,19 +14,22 @@
 /// <tr><td>2024-11-23 <td>1.1     <td>zenglj  <td>表达式版增强
 /// </table>
 ///
-#include <cstddef>
 #include <cstdint>
 #include <cstdio>
-#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
 #include "AST.h"
+#include "ArgInstruction.h"
+#include "AttrType.h"
 #include "Common.h"
+#include "FormalParam.h"
 #include "Function.h"
 #include "IRCode.h"
 #include "IRGenerator.h"
+#include "Instruction.h"
 #include "IntegerType.h"
+#include "LocalVariable.h"
 #include "Module.h"
 #include "EntryInstruction.h"
 #include "LabelInstruction.h"
@@ -36,7 +39,9 @@
 #include "MoveInstruction.h"
 #include "GotoInstruction.h"
 #include "CondGotoInstruction.h"
+#include "Type.h"
 #include "UnaryInstruction.h"
+#include "Value.h"
 
 /// @brief 构造函数
 /// @param _root AST的根
@@ -174,7 +179,14 @@ ast_node * IRGenerator::ir_visit_ast_node_with_2_labels(ast_node * node,
             break;
         default:
             // 如果不是逻辑或关系表达式，调用默认处理函数
-            result = ir_visit_ast_node(node);
+            // result = ir_visit_ast_node(node);
+            // 对于返回值再判断其是否不等于 0，从而判断是否为 true
+
+            // 构造一个用于比较的，值为零的节点
+            ast_node * zeroNode = ast_node::New(digit_int_attr{0, node->line_no});
+            ast_node * notNode = ast_node::New(ast_operator_type::AST_OP_NE, node, zeroNode, nullptr);
+            result = ir_not_equal(notNode, trueLabel, falseLabel);
+            node = notNode;
             break;
     }
 
@@ -221,7 +233,7 @@ bool IRGenerator::ir_compile_unit(ast_node * node)
 /// @return 翻译是否成功，true：成功，false：失败
 bool IRGenerator::ir_function_define(ast_node * node)
 {
-    bool result;
+    bool result = false;
 
     // 创建一个函数，用于当前函数处理
     if (module->getCurrentFunction()) {
@@ -262,13 +274,13 @@ bool IRGenerator::ir_function_define(ast_node * node)
     // 创建并加入Entry入口指令
     irCode.addInst(new EntryInstruction(newFunc));
 
-    // 创建出口指令并不加入出口指令，等函数内的指令处理完毕后加入出口指令
+    // 创建出口指令但不加入出口指令，等函数内的指令处理完毕后加入出口指令
     LabelInstruction * exitLabelInst = new LabelInstruction(newFunc);
 
     // 函数出口指令保存到函数信息中，因为在语义分析函数体时return语句需要跳转到函数尾部，需要这个label指令
     newFunc->setExitLabel(exitLabelInst);
 
-    // 遍历形参，没有IR指令，不需要追加
+    // 遍历形参
     result = ir_function_formal_params(param_node);
     if (!result) {
         // 形参解析失败
@@ -277,16 +289,29 @@ bool IRGenerator::ir_function_define(ast_node * node)
     }
     node->blockInsts.addInst(param_node->blockInsts);
 
-    // 新建一个Value，用于保存函数的返回值，如果没有返回值可不用申请
+    // 新建一个Value，用于保存函数的返回值
+    // 对于void类型函数，返回值变量会保持为nullptr
     LocalVariable * retValue = nullptr;
     if (!type_node->type->isVoidType()) {
-
-        // 保存函数返回值变量到函数信息中，在return语句翻译时需要设置值到这个变量中
+        // 创建返回值变量
         retValue = static_cast<LocalVariable *>(module->newVarValue(type_node->type));
-    }
-    newFunc->setReturnValue(retValue);
 
-    // 这里最好设置返回值变量的初值为0，以便在没有返回值时能够返回0
+        // 为返回值变量设置初始值0，以便在没有return语句时能够返回默认值
+        // 根据返回类型选择合适的常量初始值
+        Value * zeroValue = nullptr;
+        if (type_node->type->isIntegerType()) {
+            zeroValue = module->newConstInt(0);
+        } else {
+            // 其他类型默认使用整型0
+            zeroValue = module->newConstInt(0);
+        }
+
+        // 创建初始化指令
+        MoveInstruction * initInst = new MoveInstruction(newFunc, retValue, zeroValue);
+        irCode.addInst(initInst);
+    }
+    // 无论是否为void类型，都设置函数返回值变量（void为nullptr）
+    newFunc->setReturnValue(retValue);
 
     // 函数内已经进入作用域，内部不再需要做变量的作用域管理
     block_node->needScope = false;
@@ -311,6 +336,7 @@ bool IRGenerator::ir_function_define(ast_node * node)
     irCode.addInst(exitLabelInst);
 
     // 函数出口指令
+    // 对于void类型函数，retValue为nullptr，ExitInstruction将不带返回值
     irCode.addInst(new ExitInstruction(newFunc, retValue));
 
     // 恢复成外部函数
@@ -322,17 +348,65 @@ bool IRGenerator::ir_function_define(ast_node * node)
     return true;
 }
 
-/// @brief 形式参数AST节点翻译成线性中间IR
+/// @brief 形式参数列表AST节点翻译成线性中间IR
 /// @param node AST节点
 /// @return 翻译是否成功，true：成功，false：失败
 bool IRGenerator::ir_function_formal_params(ast_node * node)
 {
-    // TODO 目前形参还不支持，直接返回true
+    // 获取当前正在处理的函数
+    Function * currentFunc = module->getCurrentFunction();
+    if (!currentFunc) {
+        // 错误：不在函数定义内部
+        minic_log(LOG_ERROR, "形参翻译时当前没有活动的函数");
+        return false;
+    }
 
-    // 每个形参变量都创建对应的临时变量，用于表达实参转递的值
-    // 而真实的形参则创建函数内的局部变量。
-    // 然后产生赋值指令，用于把表达实参值的临时变量拷贝到形参局部变量上。
-    // 请注意这些指令要放在Entry指令后面，因此处理的先后上要注意。
+    // 遍历所有的形参，每个形参是AST_OP_FUNC_FORMAL_PARAM类型节点
+    for (auto paramNode: node->sons) {
+        if (paramNode->node_type != ast_operator_type::AST_OP_FUNC_FORMAL_PARAM) {
+            // 错误：非形参节点
+            minic_log(LOG_ERROR, "形参列表中包含非形参节点");
+            continue;
+        }
+
+        ir_function_formal_param(paramNode);
+        node->blockInsts.addInst(paramNode->blockInsts);
+    }
+
+    return true;
+}
+
+/// @brief 形式参数AST节点翻译成线性中间IR
+/// @param node AST节点
+/// @return 翻译是否成功，true：成功，false：失败
+bool IRGenerator::ir_function_formal_param(ast_node * node)
+{
+    // 形参节点的第一个子节点是类型，第二个是变量名
+    ast_node * typeNode = node->sons[0];
+    ast_node * nameNode = node->sons[1];
+
+    // 检查类型节点是否有效
+    if (!typeNode->type) {
+        minic_log(LOG_ERROR, "形参类型无效");
+        return false;
+    }
+
+    // 为形参创建临时变量，插入参数列表
+    FormalParam * formalParam = new FormalParam(typeNode->type, nameNode->name);
+    module->getCurrentFunction()->getParams().push_back(formalParam);
+
+    // 为形参创建局部变量，用于存储实际值
+    LocalVariable * paramVar = static_cast<LocalVariable *>(module->newVarValue(typeNode->type, nameNode->name));
+    if (!paramVar) {
+        // 错误：无法创建形参变量
+        minic_log(LOG_ERROR, "无法创建形参变量 %s", nameNode->name.c_str());
+        return false;
+    }
+    node->val = paramVar;
+
+    // 创建赋值语句，把实参的值复制给变量
+    MoveInstruction * moveInst = new MoveInstruction(module->getCurrentFunction(), paramVar, formalParam);
+    node->blockInsts.addInst(moveInst);
 
     return true;
 }
@@ -367,37 +441,62 @@ bool IRGenerator::ir_function_call(ast_node * node)
     // 当前函数存在函数调用
     currentFunc->setExistFuncCall(true);
 
-    // 如果没有孩子，也认为是没有参数
-    if (!paramsNode->sons.empty()) {
+    // 处理函数调用参数
+    int32_t argsCount = (int32_t) paramsNode->sons.size();
 
-        int32_t argsCount = (int32_t) paramsNode->sons.size();
-
-        // 当前函数中调用函数实参个数最大值统计，实际上是统计实参传参需在栈中分配的大小
-        // 因为目前的语言支持的int和float都是四字节的，只统计个数即可
-        if (argsCount > currentFunc->getMaxFuncCallArgCnt()) {
-            currentFunc->setMaxFuncCallArgCnt(argsCount);
-        }
-
-        // 遍历参数列表，孩子是表达式
-        // 这里自左往右计算表达式
-        for (auto son: paramsNode->sons) {
-
-            // 遍历Block的每个语句，进行显示或者运算
-            ast_node * temp = ir_visit_ast_node(son);
-            if (!temp) {
-                return false;
-            }
-
-            realParams.push_back(temp->val);
-            node->blockInsts.addInst(temp->blockInsts);
-        }
+    // 当前函数中调用函数实参个数最大值统计，实际上是统计实参传参需在栈中分配的大小
+    // 因为目前的语言支持的int和float都是四字节的，只统计个数即可
+    if (argsCount > currentFunc->getMaxFuncCallArgCnt()) {
+        currentFunc->setMaxFuncCallArgCnt(argsCount);
     }
 
-    // TODO 这里请追加函数调用的语义错误检查，这里只进行了函数参数的个数检查等，其它请自行追加。
+    // 遍历参数列表，孩子是表达式
+    // 这里自左往右计算表达式
+    for (auto son: paramsNode->sons) {
+        // 计算参数表达式的值
+        ast_node * temp = ir_visit_ast_node(son);
+        if (!temp) {
+            return false;
+        }
+
+        // // 生成ARG指令，表示函数参数
+        // ArgInstruction * argInst = new ArgInstruction(currentFunc, temp->val);
+        // node->blockInsts.addInst(temp->blockInsts);
+        // node->blockInsts.addInst(argInst);
+
+        // 保存参数值用于函数调用
+        realParams.push_back(temp->val);
+    }
+
+    // 进行参数相关的语义错误检查
+    // 检查参数个数
     if (realParams.size() != calledFunction->getParams().size()) {
         // 函数参数的个数不一致，语义错误
-        minic_log(LOG_ERROR, "第%lld行的被调用函数(%s)未定义或声明", (long long) lineno, funcName.c_str());
+        minic_log(LOG_ERROR,
+                  "第%lld行的被调用函数(%s)参数个数不匹配，需要%zu个参数，提供了%zu个",
+                  (long long) lineno,
+                  funcName.c_str(),
+                  calledFunction->getParams().size(),
+                  realParams.size());
         return false;
+    }
+
+    // 检查每个参数的类型是否匹配
+    for (size_t i = 0; i < realParams.size(); ++i) {
+        FormalParam * formalParam = calledFunction->getParams()[i];
+        Value * actualParam = realParams[i];
+
+        // 类型兼容性检查
+        if ((formalParam->getType()) != (actualParam->getType())) {
+            minic_log(LOG_ERROR,
+                      "第%lld行的被调用函数(%s)参数类型不匹配，第%zu个参数期望%s类型，提供了%s类型",
+                      (long long) lineno,
+                      funcName.c_str(),
+                      i + 1,
+                      formalParam->getType()->toString().c_str(),
+                      actualParam->getType()->toString().c_str());
+            return false;
+        }
     }
 
     // 返回调用有返回值，则需要分配临时变量，用于保存函数调用的返回值
@@ -777,19 +876,43 @@ bool IRGenerator::ir_return(ast_node * node)
 
     // 这里只处理整型的数据，如需支持实数，则需要针对类型进行处理
     Function * currentFunc = module->getCurrentFunction();
+    LocalVariable * returnValue = currentFunc->getReturnValue();
 
-    // 返回值存在时则移动指令到node中
-    if (right) {
-
+    // 检查函数是否有返回值，如果有且提供了返回表达式
+    if (returnValue && right) {
+        // 非void函数有返回表达式 - 正常情况
         // 创建临时变量保存IR的值，以及线性IR指令
         node->blockInsts.addInst(right->blockInsts);
 
-        // 返回值赋值到函数返回值变量上，然后跳转到函数的尾部
-        node->blockInsts.addInst(new MoveInstruction(currentFunc, currentFunc->getReturnValue(), right->val));
+        // 检查返回值类型与函数返回类型是否兼容
+        if ((returnValue->getType()) != (right->val->getType())) {
+            minic_log(LOG_ERROR,
+                      "函数返回值类型不匹配，期望%s类型，提供了%s类型",
+                      returnValue->getType()->toString().c_str(),
+                      right->val->getType()->toString().c_str());
+            // 我们允许类型不完全匹配，但给出警告
+        }
 
+        // 返回值赋值到函数返回值变量上
+        node->blockInsts.addInst(new MoveInstruction(currentFunc, returnValue, right->val));
         node->val = right->val;
-    } else {
-        // 没有返回值
+    }
+    // 如果函数有返回值但没有提供返回表达式
+    else if (returnValue && !right) {
+        minic_log(LOG_ERROR, "非void函数没有提供返回表达式");
+        // 不需要额外指令，函数返回值已在函数开始处初始化为0
+        node->val = nullptr;
+    }
+    // 如果函数没有返回值(void类型)但提供了返回表达式
+    else if (!returnValue && right) {
+        minic_log(LOG_ERROR, "void函数提供了返回表达式");
+        // 虽然返回值会被忽略，但我们仍需要执行表达式，因为它可能有副作用
+        node->blockInsts.addInst(right->blockInsts);
+        node->val = nullptr;
+    }
+    // 函数没有返回值且没有提供返回表达式，符合void返回类型要求
+    else {
+        // void函数没有返回表达式 - 正常情况
         node->val = nullptr;
     }
 
@@ -1344,7 +1467,8 @@ bool IRGenerator::ir_while_statement(ast_node * node)
     node->blockInsts.addInst(loopBodyLabel);
 
     // 遍历循环体，生成线性IR
-    ast_node * bodyResult = ir_visit_ast_node_with_2_labels(bodyNode, loopEntryLabel, loopExitLabel);
+    // ast_node * bodyResult = ir_visit_ast_node_with_2_labels(bodyNode, loopEntryLabel, loopExitLabel);
+    ast_node * bodyResult = ir_visit_ast_node(bodyNode);
     if (!bodyResult) {
         return false;
     }
