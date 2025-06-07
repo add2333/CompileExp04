@@ -296,19 +296,15 @@ bool IRGenerator::ir_function_define(ast_node * node)
         // 创建返回值变量
         retValue = static_cast<LocalVariable *>(module->newVarValue(type_node->type));
 
-        // 为返回值变量设置初始值0，以便在没有return语句时能够返回默认值
-        // 根据返回类型选择合适的常量初始值
-        Value * zeroValue = nullptr;
-        if (type_node->type->isIntegerType()) {
+        // 对于 main 函数需要设置初始值为 0 避免返回值为进程返回值
+        if (name_node->name == "main") {
+            // main函数的返回值变量需要设置初始值为0
+            // 这样在没有return语句时，默认返回0
+            Value * zeroValue = nullptr;
             zeroValue = module->newConstInt(0);
-        } else {
-            // 其他类型默认使用整型0
-            zeroValue = module->newConstInt(0);
+            MoveInstruction * initInst = new MoveInstruction(newFunc, retValue, zeroValue);
+            irCode.addInst(initInst);
         }
-
-        // 创建初始化指令
-        MoveInstruction * initInst = new MoveInstruction(newFunc, retValue, zeroValue);
-        irCode.addInst(initInst);
     }
     // 无论是否为void类型，都设置函数返回值变量（void为nullptr）
     newFunc->setReturnValue(retValue);
