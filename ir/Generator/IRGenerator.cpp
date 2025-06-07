@@ -978,6 +978,7 @@ bool IRGenerator::ir_declare_statment(ast_node * node)
         if (!result) {
             break;
         }
+        node->blockInsts.addInst(child->blockInsts);
     }
 
     return result;
@@ -988,11 +989,37 @@ bool IRGenerator::ir_declare_statment(ast_node * node)
 /// @return 翻译是否成功，true：成功，false：失败
 bool IRGenerator::ir_variable_declare(ast_node * node)
 {
-    // 共有两个孩子，第一个类型，第二个变量名
+    // 第一个孩子表示类型
+    ast_node * typeNode = node->sons[0];
 
-    // TODO 这里可强化类型等检查
+    // 第二个孩子表示变量名或赋值节点
+    ast_node * varNode = node->sons[1];
 
-    node->val = module->newVarValue(node->sons[0]->type, node->sons[1]->name);
+    // 检查是否是赋值节点
+    if (varNode->node_type == ast_operator_type::AST_OP_ASSIGN) {
+        // 赋值节点，处理初值
+        ast_node * idNode = varNode->sons[0];       // 左侧变量名节点
+        ast_node * initExprNode = varNode->sons[1]; // 右侧表达式
+
+        // 创建变量
+        Value * varValue = module->newVarValue(typeNode->type, idNode->name);
+        node->val = varValue;
+
+        // 翻译初值表达式
+        ast_node * exprResult = ir_visit_ast_node(initExprNode);
+        if (!exprResult) {
+            return false; // 初值表达式翻译失败
+        }
+
+        // 创建赋值指令，将初值赋给变量
+        MoveInstruction * assignInst = new MoveInstruction(module->getCurrentFunction(), varValue, exprResult->val);
+        node->blockInsts.addInst(exprResult->blockInsts); // 添加初值表达式的指令
+        node->blockInsts.addInst(assignInst);             // 添加赋值指令
+    } else {
+        // 非赋值节点，直接创建变量
+        Value * varValue = module->newVarValue(typeNode->type, varNode->name);
+        node->val = varValue;
+    }
 
     return true;
 }

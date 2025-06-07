@@ -638,14 +638,14 @@ std::any MiniCCSTVisitor::visitVarDecl(MiniCParser::VarDeclContext * ctx)
     type_attr typeAttr = std::any_cast<type_attr>(visitBasicType(ctx->basicType()));
 
     for (auto & varCtx: ctx->varDef()) {
-        // 变量名节点
-        ast_node * id_node = std::any_cast<ast_node *>(visitVarDef(varCtx));
+        // 获取变量定义节点（可能包含初值）
+        ast_node * var_def_node = std::any_cast<ast_node *>(visitVarDef(varCtx));
 
         // 创建类型节点
         ast_node * type_node = create_type_node(typeAttr);
 
-        // 创建变量定义节点
-        ast_node * decl_node = ast_node::New(ast_operator_type::AST_OP_VAR_DECL, type_node, id_node, nullptr);
+        // 创建变量声明节点
+        ast_node * decl_node = ast_node::New(ast_operator_type::AST_OP_VAR_DECL, type_node, var_def_node, nullptr);
 
         // 插入到变量声明语句
         (void) stmt_node->insert_son_node(decl_node);
@@ -656,14 +656,27 @@ std::any MiniCCSTVisitor::visitVarDecl(MiniCParser::VarDeclContext * ctx)
 
 std::any MiniCCSTVisitor::visitVarDef(MiniCParser::VarDefContext * ctx)
 {
-    // varDef: T_ID;
+    // varDef: T_ID (T_ASSIGN expr)?;
 
     auto varId = ctx->T_ID()->getText();
 
     // 获取行号
     int64_t lineNo = (int64_t) ctx->T_ID()->getSymbol()->getLine();
 
-    return ast_node::New(varId, lineNo);
+    // 创建变量名节点
+    ast_node * id_node = ast_node::New(varId, lineNo);
+
+    // 检查是否有初值
+    if (ctx->T_ASSIGN()) {
+        // 有初值，遍历表达式
+        ast_node * init_expr = std::any_cast<ast_node *>(visitExpr(ctx->expr()));
+
+        // 创建带初值的变量定义节点
+        return ast_node::New(ast_operator_type::AST_OP_ASSIGN, id_node, init_expr, nullptr);
+    } else {
+        // 无初值的变量定义节点
+        return id_node;
+    }
 }
 
 std::any MiniCCSTVisitor::visitBasicType(MiniCParser::BasicTypeContext * ctx)
