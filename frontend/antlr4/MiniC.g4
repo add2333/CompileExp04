@@ -14,14 +14,16 @@ grammar MiniC;
 compileUnit: (funcDef | varDecl)* EOF;
 
 // 函数定义，支持void返回类型，参数列表支持形参或void或空
-funcDef: funcType T_ID T_L_PAREN (funcParams | T_VOID)? T_R_PAREN block;
+funcDef:
+	funcType T_ID T_L_PAREN (funcParams | T_VOID)? T_R_PAREN block;
 
 // 函数返回类型
 funcType: T_INT | T_VOID;
 
-// 函数参数列表，只支持int类型参数
+// 函数参数列表，支持int类型参数和数组参数
 funcParams: funcParam (T_COMMA funcParam)*;
-funcParam: basicType T_ID;
+funcParam:
+	basicType T_ID (T_L_BRACKET T_INT_CONST? T_R_BRACKET)*;
 
 // 语句块看用作函数体，这里允许多个语句，并且不含任何语句
 block: T_L_BRACE blockItemList? T_R_BRACE;
@@ -32,14 +34,20 @@ blockItemList: blockItem+;
 // 每个Item可以是一个语句，或者变量声明语句
 blockItem: statement | varDecl;
 
-// 变量声明
+// 变量声明，支持数组声明
 varDecl: basicType varDef (T_COMMA varDef)* T_SEMICOLON;
 
 // 基本类型
 basicType: T_INT;
 
-// 变量定义
-varDef: T_ID (T_ASSIGN expr)?;
+// 变量定义，支持数组定义
+varDef:
+	T_ID (T_L_BRACKET T_INT_CONST T_R_BRACKET)* (
+		T_ASSIGN (expr | T_L_BRACE exprList T_R_BRACE)
+	)?;
+
+// 表达式列表，用于数组初始化
+exprList: expr (T_COMMA expr)*;
 
 // 目前语句支持return、赋值、if-else、while语句
 statement:
@@ -98,13 +106,15 @@ primaryExp: T_L_PAREN expr T_R_PAREN | T_INT_CONST | lVal;
 // 实参列表
 realParamList: expr (T_COMMA expr)*;
 
-// 左值表达式
-lVal: T_ID;
+// 左值表达式，支持数组下标访问
+lVal: T_ID (T_L_BRACKET expr T_R_BRACKET)*;
 
 // 用正规式来进行词法规则的描述
 
 T_L_PAREN: '(';
 T_R_PAREN: ')';
+T_L_BRACKET: '[';
+T_R_BRACKET: ']';
 T_SEMICOLON: ';';
 T_L_BRACE: '{';
 T_R_BRACE: '}';
@@ -156,3 +166,5 @@ WS: [ \r\n\t]+ -> skip;
 
 // 行注释规则
 LINE_COMMENT: '//' ~[\r\n]* -> skip;
+// 块注释规则
+BLOCK_COMMENT: '/*' .*? '*/' -> skip;
