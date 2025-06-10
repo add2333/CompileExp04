@@ -455,10 +455,8 @@ bool IRGenerator::ir_function_call(ast_node * node)
             return false;
         }
 
-        // // 生成ARG指令，表示函数参数
-        // ArgInstruction * argInst = new ArgInstruction(currentFunc, temp->val);
-        // node->blockInsts.addInst(temp->blockInsts);
-        // node->blockInsts.addInst(argInst);
+        // 生成函数参数计算指令
+        node->blockInsts.addInst(temp->blockInsts);
 
         // 保存参数值用于函数调用
         realParams.push_back(temp->val);
