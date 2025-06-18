@@ -247,6 +247,21 @@ protected:
     /// @return 翻译是否成功，true：成功，false：失败
     bool ir_continue_statement(ast_node * node);
 
+    /// @brief 数组声明AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_array_declare(ast_node * node);
+
+    /// @brief 数组访问AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_array_access(ast_node * node);
+
+    /// @brief 数组初始化AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_array_init(ast_node * node);
+
     /// @brief AST的节点操作函数
     typedef bool (IRGenerator::*ast2ir_handler_t)(ast_node *);
 

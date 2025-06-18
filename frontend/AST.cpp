@@ -430,3 +430,59 @@ ast_node * add_var_decl_node(ast_node * stmt_node, var_id_attr & id)
 
     return stmt_node;
 }
+
+/// @brief 创建数组声明节点
+/// @param id 数组名
+/// @param dimensions 数组维度大小列表
+/// @return 创建的数组声明节点
+ast_node * create_array_decl(var_id_attr & id, std::vector<ast_node *> dimensions)
+{
+    // 创建数组名节点
+    ast_node * id_node = ast_node::New(id.id, id.lineno);
+
+    // 释放字符串
+    free(id.id);
+    id.id = nullptr;
+
+    // 创建数组声明节点
+    ast_node * array_decl_node = create_contain_node(ast_operator_type::AST_OP_ARRAY_DECL, id_node);
+    array_decl_node->name = id_node->name;
+
+    // 添加维度节点
+    for (auto dim: dimensions) {
+        array_decl_node->insert_son_node(dim);
+    }
+
+    return array_decl_node;
+}
+
+/// @brief 创建数组访问节点
+/// @param array_node 数组变量节点
+/// @param index_exprs 下标表达式列表
+/// @return 创建的数组访问节点
+ast_node * create_array_access(ast_node * array_node, std::vector<ast_node *> index_exprs)
+{
+    ast_node * access_node = create_contain_node(ast_operator_type::AST_OP_ARRAY_ACCESS, array_node);
+
+    // 添加下标表达式
+    for (auto index: index_exprs) {
+        access_node->insert_son_node(index);
+    }
+
+    return access_node;
+}
+
+/// @brief 创建数组初始化列表节点
+/// @param init_exprs 初始化表达式列表
+/// @return 创建的数组初始化节点
+ast_node * create_array_init(std::vector<ast_node *> init_exprs)
+{
+    ast_node * init_node = create_contain_node(ast_operator_type::AST_OP_ARRAY_INIT);
+
+    // 添加初始化表达式
+    for (auto expr: init_exprs) {
+        init_node->insert_son_node(expr);
+    }
+
+    return init_node;
+}

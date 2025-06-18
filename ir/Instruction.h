@@ -92,6 +92,9 @@ enum class IRInstOperator : std::int8_t {
     /// @brief while指令
     IRINST_OP_WHILE_I,
 
+    /// @brief 解引用指令，用于指针类型的值
+    IRINST_OP_DEREF,
+
     /// @brief 最大指令码，也是无效指令
     IRINST_OP_MAX
 };

@@ -112,6 +112,13 @@ void Function::toString(std::string & str)
         // 局部变量和临时变量需要输出declare语句
         str += "\tdeclare " + var->getType()->toString() + " " + var->getIRName();
 
+        // 如果是数组变量，输出维度信息
+        if (var->getIsArray()) {
+            for (auto dim: var->getArrayDimensions()) {
+                str += "[" + std::to_string(dim) + "]";
+            }
+        }
+
         std::string extraStr;
         std::string realName = var->getName();
         if (!realName.empty()) {

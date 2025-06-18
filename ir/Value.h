@@ -48,6 +48,12 @@ protected:
     ///
     std::vector<Use *> uses;
 
+    /// @brief 数组维度信息
+    std::vector<int32_t> arrayDimensions;
+
+    /// @brief 是否为数组类型
+    bool isArray = false;
+
 public:
     /// @brief 构造函数
     /// @param _type
@@ -124,4 +130,61 @@ public:
     /// @return int32_t 寄存器编号
     ///
     virtual void setLoadRegId(int32_t regId);
+
+    /// @brief 设置数组维度
+    void setArrayDimensions(const std::vector<int32_t> & dims)
+    {
+        arrayDimensions = dims;
+        isArray = !dims.empty();
+    }
+
+    /// @brief 获取数组维度
+    const std::vector<int32_t> & getArrayDimensions() const
+    {
+        return arrayDimensions;
+    }
+
+    /// @brief 是否是数组
+    bool getIsArray() const
+    {
+        return isArray;
+    }
+
+    /// @brief 设置是否是数组
+    /// @param isArray 是否是数组
+    void setIsArray(bool isArray)
+    {
+        this->isArray = isArray;
+    }
+
+    /// @brief 获取数组在某个维度上的大小
+    /// @param dimension 维度索引（从0开始）
+    /// @return 该维度的大小，如果维度无效返回0
+    int32_t getArrayDimensionSize(size_t dimension) const
+    {
+        if (dimension < arrayDimensions.size()) {
+            return arrayDimensions[dimension];
+        }
+        return 0;
+    }
+
+    /// @brief 获取数组总的维度数
+    /// @return 维度数
+    size_t getArrayDimensionCount() const
+    {
+        return arrayDimensions.size();
+    }
+
+    /// @brief 计算多维数组线性索引的乘积因子
+    /// @param dimension 当前维度索引
+    /// @return 该维度的乘积因子
+    int32_t getArrayDimensionMultiplier(size_t dimension) const
+    {
+        int32_t multiplier = 1;
+        // 计算当前维度后面所有维度大小的乘积
+        for (size_t i = dimension + 1; i < arrayDimensions.size(); i++) {
+            multiplier *= arrayDimensions[i];
+        }
+        return multiplier;
+    }
 };

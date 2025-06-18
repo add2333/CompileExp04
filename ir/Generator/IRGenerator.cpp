@@ -30,6 +30,7 @@
 #include "Instruction.h"
 #include "IntegerType.h"
 #include "LocalVariable.h"
+#include "MemVariable.h"
 #include "Module.h"
 #include "EntryInstruction.h"
 #include "LabelInstruction.h"
@@ -39,6 +40,7 @@
 #include "MoveInstruction.h"
 #include "GotoInstruction.h"
 #include "CondGotoInstruction.h"
+#include "PointerType.h"
 #include "Type.h"
 #include "UnaryInstruction.h"
 #include "Value.h"
@@ -82,6 +84,11 @@ IRGenerator::IRGenerator(ast_node * _root, Module * _module) : root(_root), modu
     /* 变量定义语句 */
     ast2ir_handlers[ast_operator_type::AST_OP_DECL_STMT] = &IRGenerator::ir_declare_statment;
     ast2ir_handlers[ast_operator_type::AST_OP_VAR_DECL] = &IRGenerator::ir_variable_declare;
+
+    // /* 数组相关 */
+    ast2ir_handlers[ast_operator_type::AST_OP_ARRAY_DECL] = &IRGenerator::ir_array_declare;
+    ast2ir_handlers[ast_operator_type::AST_OP_ARRAY_ACCESS] = &IRGenerator::ir_array_access;
+    // ast2ir_handlers[ast_operator_type::AST_OP_ARRAY_INIT] = &IRGenerator::ir_array_init;
 
     /* 语句块 */
     ast2ir_handlers[ast_operator_type::AST_OP_BLOCK] = &IRGenerator::ir_block;
@@ -978,39 +985,95 @@ bool IRGenerator::ir_declare_statment(ast_node * node)
     return result;
 }
 
-/// @brief 变量定声明节点翻译成线性中间IR
-/// @param node AST节点
+/// @brief 变量声明节点翻译成线性中间IR
+/// @param node AST节点 (AST_OP_VAR_DECL类型)
 /// @return 翻译是否成功，true：成功，false：失败
 bool IRGenerator::ir_variable_declare(ast_node * node)
 {
-    // 第一个孩子表示类型
-    ast_node * typeNode = node->sons[0];
+    // var-decl节点结构：
+    // 第一个子节点：类型节点
+    // 第二个子节点：变量名节点 或 array-decl节点 或 赋值节点
 
-    // 第二个孩子表示变量名或赋值节点
+    if (node->sons.size() < 2) {
+        minic_log(LOG_ERROR, "变量声明节点结构不完整");
+        return false;
+    }
+
+    ast_node * typeNode = node->sons[0];
     ast_node * varNode = node->sons[1];
 
-    // 检查是否是赋值节点
-    if (varNode->node_type == ast_operator_type::AST_OP_ASSIGN) {
-        // 赋值节点，处理初值
-        ast_node * idNode = varNode->sons[0];       // 左侧变量名节点
-        ast_node * initExprNode = varNode->sons[1]; // 右侧表达式
+    // 检查第二个子节点的类型
+    if (varNode->node_type == ast_operator_type::AST_OP_ARRAY_DECL) {
+        // 数组声明：将类型信息传递给数组声明节点
+        varNode->type = typeNode->type;
 
-        // 创建变量
-        Value * varValue = module->newVarValue(typeNode->type, idNode->name);
-        node->val = varValue;
-
-        // 翻译初值表达式
-        ast_node * exprResult = ir_visit_ast_node(initExprNode);
-        if (!exprResult) {
-            return false; // 初值表达式翻译失败
+        ast_node * arrayResult = ir_visit_ast_node(varNode);
+        if (!arrayResult) {
+            return false;
         }
 
-        // 创建赋值指令，将初值赋给变量
-        MoveInstruction * assignInst = new MoveInstruction(module->getCurrentFunction(), varValue, exprResult->val);
-        node->blockInsts.addInst(exprResult->blockInsts); // 添加初值表达式的指令
-        node->blockInsts.addInst(assignInst);             // 添加赋值指令
+        node->blockInsts.addInst(arrayResult->blockInsts);
+        node->val = arrayResult->val;
+        return true;
+    } else if (varNode->node_type == ast_operator_type::AST_OP_ASSIGN) {
+        // 赋值节点，处理初值
+        ast_node * leftNode = varNode->sons[0];     // 左侧：变量名或数组声明
+        ast_node * initExprNode = varNode->sons[1]; // 右侧：初始化表达式
+
+        if (leftNode->node_type == ast_operator_type::AST_OP_ARRAY_DECL) {
+            // 数组初始化：int arr[3] = {1, 2, 3};
+            leftNode->type = typeNode->type; // 传递类型信息
+
+            ast_node * arrayResult = ir_visit_ast_node(leftNode);
+            if (!arrayResult) {
+                return false;
+            }
+
+            node->blockInsts.addInst(arrayResult->blockInsts);
+
+            // 处理初始化表达式
+            ast_node * initResult = ir_visit_ast_node(initExprNode);
+            if (!initResult) {
+                return false;
+            }
+
+            node->blockInsts.addInst(initResult->blockInsts);
+
+            // 创建数组初始化指令
+            if (initExprNode->node_type == ast_operator_type::AST_OP_ARRAY_INIT) {
+                // 数组初始化列表 {1, 2, 3}
+                minic_log(LOG_DEBUG, "处理数组初始化列表");
+                // TODO: 生成逐个元素赋值的指令
+            } else {
+                // 单个表达式初始化
+                MoveInstruction * assignInst =
+                    new MoveInstruction(module->getCurrentFunction(), arrayResult->val, initResult->val);
+                node->blockInsts.addInst(assignInst);
+            }
+
+            node->val = arrayResult->val;
+            return true;
+        } else {
+            // 普通变量初始化：int a = 5;
+            ast_node * idNode = leftNode;
+
+            // 创建变量
+            Value * varValue = module->newVarValue(typeNode->type, idNode->name);
+            node->val = varValue;
+
+            // 翻译初值表达式
+            ast_node * exprResult = ir_visit_ast_node(initExprNode);
+            if (!exprResult) {
+                return false;
+            }
+
+            // 创建赋值指令
+            MoveInstruction * assignInst = new MoveInstruction(module->getCurrentFunction(), varValue, exprResult->val);
+            node->blockInsts.addInst(exprResult->blockInsts);
+            node->blockInsts.addInst(assignInst);
+        }
     } else {
-        // 非赋值节点，直接创建变量
+        // 普通变量声明：int a;
         Value * varValue = module->newVarValue(typeNode->type, varNode->name);
         node->val = varValue;
     }
@@ -1546,6 +1609,186 @@ bool IRGenerator::ir_continue_statement(ast_node * node)
 
     // 创建无条件跳转指令到循环入口
     node->blockInsts.addInst(new GotoInstruction(currentFunc, continueLabel));
+
+    return true;
+}
+
+/// @brief 数组声明AST节点翻译成线性中间IR
+/// @param node AST节点 (AST_OP_ARRAY_DECL类型)
+/// @return 翻译是否成功，true：成功，false：失败
+bool IRGenerator::ir_array_declare(ast_node * node)
+{
+    // array-decl节点结构：
+    // 第一个子节点：数组名节点
+    // 其余子节点：维度大小节点
+
+    if (node->sons.size() < 1) {
+        minic_log(LOG_ERROR, "数组声明节点结构不完整");
+        return false;
+    }
+
+    // 获取数组名
+    ast_node * nameNode = node->sons[0];
+    std::string arrayName = nameNode->name;
+
+    // 计算数组的维度信息
+    std::vector<int32_t> dimensions;
+    int32_t totalSize = 1;
+
+    // 遍历所有维度节点（从第二个子节点开始）
+    for (size_t i = 1; i < node->sons.size(); i++) {
+        ast_node * dimNode = node->sons[i];
+        if (dimNode && dimNode->node_type == ast_operator_type::AST_OP_LEAF_LITERAL_UINT) {
+            int32_t dimSize = (int32_t) dimNode->integer_val;
+            dimensions.push_back(dimSize);
+            totalSize *= dimSize;
+        } else {
+            minic_log(LOG_ERROR, "数组维度必须是常量，数组：%s", arrayName.c_str());
+            return false;
+        }
+    }
+
+    // 从node本身获取类型信息，如果没有则从父节点获取
+    Type * elementType = nullptr;
+
+    if (node->type) {
+        elementType = node->type;
+    } else {
+        // 默认使用int类型
+        elementType = IntegerType::getTypeInt();
+        minic_log(LOG_ERROR, "数组声明未找到类型信息，默认使用int类型：%s", arrayName.c_str());
+    }
+
+    // 创建数组变量
+    LocalVariable * arrayVar = static_cast<LocalVariable *>(module->newVarValue(elementType, arrayName));
+
+    if (!arrayVar) {
+        minic_log(LOG_ERROR, "无法创建数组变量 %s", arrayName.c_str());
+        return false;
+    }
+
+    // 如果LocalVariable支持数组维度，设置维度信息
+    arrayVar->setArrayDimensions(dimensions);
+    arrayVar->setIsArray(true);
+
+    node->val = arrayVar;
+
+    // 构建维度信息字符串用于日志
+    std::string dimStr = "";
+    for (size_t i = 0; i < dimensions.size(); i++) {
+        dimStr += "[" + std::to_string(dimensions[i]) + "]";
+    }
+
+    minic_log(LOG_DEBUG, "创建数组变量: %s%s, 总大小: %d", arrayName.c_str(), dimStr.c_str(), totalSize);
+
+    return true;
+}
+
+/// @brief 数组访问AST节点翻译成线性中间IR
+/// @param node AST节点
+/// @return 翻译是否成功，true：成功，false：失败
+bool IRGenerator::ir_array_access(ast_node * node)
+{
+    // array-access节点结构：
+    // 第一个子节点：数组变量名节点
+    // 其余子节点：各维度的索引表达式节点
+
+    if (node->sons.size() < 2) {
+        minic_log(LOG_ERROR, "数组访问节点结构不完整");
+        return false;
+    }
+
+    // 获取数组变量
+    ast_node * arrayNode = node->sons[0];
+    Value * arrayVar = module->findVarValue(arrayNode->name);
+    size_t indexCount = node->sons.size() - 1; // 减去数组变量名节点
+    Function * currentFunc = module->getCurrentFunction();
+    Type * intType = IntegerType::getTypeInt();
+    Type * elementType = arrayVar->getType(); // 数组元素类型
+
+    // 创建指向元素类型的指针类型
+    const Type * ptrType = PointerType::get(elementType);
+
+    // 计算线性偏移量`
+    // 对于多维数组 arr[d0][d1][d2]，访问 arr[i0][i1][i2] 的线性偏移量为：
+    // offset = i0 * (d1 * d2) + i1 * d2 + i2
+    Value * totalOffset = nullptr;
+
+    for (size_t i = 0; i < indexCount; i++) {
+        // 计算当前维度的索引表达式
+        ast_node * indexNode = node->sons[i + 1];
+        ast_node * indexResult = ir_visit_ast_node(indexNode);
+        if (!indexResult) {
+            minic_log(LOG_ERROR, "无法计算数组索引表达式");
+            return false;
+        }
+
+        node->blockInsts.addInst(indexResult->blockInsts);
+        Value * indexValue = indexResult->val;
+
+        // 计算当前维度的乘积因子
+        int32_t multiplier = arrayVar->getArrayDimensionMultiplier(i);
+
+        Value * currentOffset = nullptr;
+        if (multiplier == 1) {
+            // 最后一维，直接使用索引值
+            currentOffset = indexValue;
+        } else {
+            // 需要乘以乘积因子
+            Value * multiplierConst = module->newConstInt(multiplier);
+            BinaryInstruction * mulInst = new BinaryInstruction(currentFunc,
+                                                                IRInstOperator::IRINST_OP_MUL_I,
+                                                                indexValue,
+                                                                multiplierConst,
+                                                                intType);
+            node->blockInsts.addInst(mulInst);
+            currentOffset = mulInst;
+        }
+
+        // 累加到总偏移量
+        if (totalOffset == nullptr) {
+            totalOffset = currentOffset;
+        } else {
+            BinaryInstruction * addInst = new BinaryInstruction(currentFunc,
+                                                                IRInstOperator::IRINST_OP_ADD_I,
+                                                                totalOffset,
+                                                                currentOffset,
+                                                                intType);
+            node->blockInsts.addInst(addInst);
+            totalOffset = addInst;
+        }
+    }
+
+    // 将偏移量转换为字节偏移量（假设每个元素4字节）
+    Value * elementSize = module->newConstInt(4);
+    BinaryInstruction * byteOffsetInst =
+        new BinaryInstruction(currentFunc, IRInstOperator::IRINST_OP_MUL_I, totalOffset, elementSize, intType);
+    node->blockInsts.addInst(byteOffsetInst);
+
+    // 计算最终地址：数组基址 + 字节偏移量
+    BinaryInstruction * addrInst = new BinaryInstruction(currentFunc,
+                                                         IRInstOperator::IRINST_OP_ADD_I,
+                                                         arrayVar,
+                                                         byteOffsetInst,
+                                                         const_cast<Type *>(ptrType));
+    node->blockInsts.addInst(addrInst);
+
+
+    if (node->parent && node->parent->node_type == ast_operator_type::AST_OP_ASSIGN && node->parent->sons[0] == node) {
+        // 如果是赋值操作，并且数组访问节点为该赋值操作的左节点，即目标操作数，
+        // 则需要将结果值设置为指向元素的指针
+        node->val = addrInst;
+        minic_log(LOG_DEBUG, "生成数组赋值IR: %zu维数组，元素类型: %s", indexCount, elementType->toString().c_str());
+        return true;
+    } else {
+        // 如果是读取操作，则生成赋值指令，将指针的指向的地址的值取出
+        // 将结果值设置为元素的值
+        UnaryInstruction * loadInst = new UnaryInstruction(currentFunc, IRInstOperator::IRINST_OP_DEREF, addrInst, elementType);
+        node->blockInsts.addInst(loadInst);
+        node->val = loadInst;
+    }
+
+    minic_log(LOG_DEBUG, "生成数组访问IR: %zu维数组，元素类型: %s", indexCount, elementType->toString().c_str());
 
     return true;
 }

@@ -90,6 +90,13 @@ public:
     void toDeclareString(std::string & str)
     {
         str = "declare " + getType()->toString() + " " + getIRName();
+
+        // 如果是数组，添加维度信息
+        if (isArray) {
+            for (int32_t dim: arrayDimensions) {
+                str += "[" + std::to_string(dim) + "]";
+            }
+        }
     }
 
 private:

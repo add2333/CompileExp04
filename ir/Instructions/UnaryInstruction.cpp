@@ -12,9 +12,11 @@
 /// <table>
 /// <tr><th>Date       <th>Version <th>Author  <th>Description
 /// <tr><td>2025-05-07 <td>1.0     <td>add  <td>新建
+/// <tr><td>2025-06-18 <td>1.1     <td>add  <td>添加解引用指令
 /// </table>
 ///
 #include "UnaryInstruction.h"
+#include "Instruction.h"
 
 /// @brief 构造函数
 /// @param _op 操作符
@@ -38,6 +40,12 @@ void UnaryInstruction::toString(std::string & str)
 
             // 求负指令，单目运算
             str = getIRName() + " = neg " + src1->getIRName();
+            break;
+
+        case IRInstOperator::IRINST_OP_DEREF:
+
+            // 解引用指令，单目运算
+            str = getIRName() + " = *" + src1->getIRName();
             break;
 
         default:

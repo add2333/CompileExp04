@@ -139,11 +139,11 @@ std::any MiniCCSTVisitor::visitFuncParams(MiniCParser::FuncParamsContext * ctx)
     return paramsNode;
 }
 
-/// @brief 非终结运算符funcParam的遍历
+/// @brief 非终结符funcParam的遍历
 /// @param ctx CST上下文
 std::any MiniCCSTVisitor::visitFuncParam(MiniCParser::FuncParamContext * ctx)
 {
-    // 识别的文法产生式：funcParam: basicType T_ID;
+    // 识别的文法产生式：funcParam: basicType T_ID (T_L_BRACKET T_INT_CONST? T_R_BRACKET)*;
 
     // 获取参数类型
     type_attr paramType = std::any_cast<type_attr>(visitBasicType(ctx->basicType()));
@@ -152,8 +152,45 @@ std::any MiniCCSTVisitor::visitFuncParam(MiniCParser::FuncParamContext * ctx)
     char * id = strdup(ctx->T_ID()->getText().c_str());
     var_id_attr paramName{id, (int64_t) ctx->T_ID()->getSymbol()->getLine()};
 
-    // 创建参数节点
-    return create_func_param(paramType, paramName);
+    // 创建类型节点
+    ast_node * type_node = create_type_node(paramType);
+
+    // 创建参数名节点
+    ast_node * name_node = ast_node::New(paramName);
+
+    // 检查是否是数组参数
+    if (!ctx->T_L_BRACKET().empty()) {
+        // 数组参数，支持多维数组 如 int arr[] 或 int arr[10] 或 int arr[10][20]
+        std::vector<ast_node *> dimension_exprs;
+
+        // 获取所有的整数常量（维度大小）
+        auto intConstList = ctx->T_INT_CONST();
+        size_t intConstIndex = 0;
+
+        // 遍历所有的 [ ] 对
+        for (size_t i = 0; i < ctx->T_L_BRACKET().size(); i++) {
+            if (intConstIndex < intConstList.size()) {
+                // 有具体维度大小，如 arr[10]
+                std::string dimText = intConstList[intConstIndex]->getText();
+                uint32_t dimVal = (uint32_t) stoull(dimText, nullptr, 0);
+                int64_t dimLineNo = (int64_t) intConstList[intConstIndex]->getSymbol()->getLine();
+                dimension_exprs.push_back(ast_node::New(digit_int_attr{dimVal, dimLineNo}));
+                intConstIndex++;
+            } else {
+                // 没有具体维度大小，如 arr[]，用空指针表示
+                dimension_exprs.push_back(nullptr);
+            }
+        }
+
+        // 创建数组访问节点来表示这是数组类型参数
+        ast_node * array_access_node = create_array_access(name_node, dimension_exprs);
+
+        // 创建形参节点，包含类型节点和数组访问节点
+        return ast_node::New(ast_operator_type::AST_OP_FUNC_FORMAL_PARAM, type_node, array_access_node, nullptr);
+    } else {
+        // 普通参数，只包含类型和名称
+        return ast_node::New(ast_operator_type::AST_OP_FUNC_FORMAL_PARAM, type_node, name_node, nullptr);
+    }
 }
 
 /// @brief 非终结运算符block的遍历
@@ -617,14 +654,44 @@ std::any MiniCCSTVisitor::visitPrimaryExp(MiniCParser::PrimaryExpContext * ctx)
 
 std::any MiniCCSTVisitor::visitLVal(MiniCParser::LValContext * ctx)
 {
-    // 识别文法产生式：lVal: T_ID;
-    // 获取ID的名字
+    // 识别文法产生式：lVal: T_ID (T_L_BRACKET expr T_R_BRACKET)*;
+
+    // 获取变量名
     auto varId = ctx->T_ID()->getText();
-
-    // 获取行号
     int64_t lineNo = (int64_t) ctx->T_ID()->getSymbol()->getLine();
+    ast_node * var_node = ast_node::New(varId, lineNo);
 
-    return ast_node::New(varId, lineNo);
+    // 检查是否有数组下标
+    if (!ctx->T_L_BRACKET().empty()) {
+        // 数组访问
+        std::vector<ast_node *> index_exprs;
+
+        // 遍历所有下标表达式
+        for (auto exprCtx: ctx->expr()) {
+            ast_node * index_expr = std::any_cast<ast_node *>(visitExpr(exprCtx));
+            index_exprs.push_back(index_expr);
+        }
+
+        return create_array_access(var_node, index_exprs);
+    } else {
+        // 普通变量
+        return var_node;
+    }
+}
+
+std::any MiniCCSTVisitor::visitExprList(MiniCParser::ExprListContext * ctx)
+{
+    // 识别的文法产生式：exprList: expr (T_COMMA expr)*;
+
+    std::vector<ast_node *> init_exprs;
+
+    // 遍历所有表达式
+    for (auto exprCtx: ctx->expr()) {
+        ast_node * expr_node = std::any_cast<ast_node *>(visitExpr(exprCtx));
+        init_exprs.push_back(expr_node);
+    }
+
+    return create_array_init(init_exprs);
 }
 
 std::any MiniCCSTVisitor::visitVarDecl(MiniCParser::VarDeclContext * ctx)
@@ -656,25 +723,56 @@ std::any MiniCCSTVisitor::visitVarDecl(MiniCParser::VarDeclContext * ctx)
 
 std::any MiniCCSTVisitor::visitVarDef(MiniCParser::VarDefContext * ctx)
 {
-    // varDef: T_ID (T_ASSIGN expr)?;
+    // varDef: T_ID (T_L_BRACKET T_INT_CONST T_R_BRACKET)* (T_ASSIGN (expr | T_L_BRACE exprList T_R_BRACE))?;
 
     auto varId = ctx->T_ID()->getText();
-
-    // 获取行号
     int64_t lineNo = (int64_t) ctx->T_ID()->getSymbol()->getLine();
 
-    // 创建变量名节点
-    ast_node * id_node = ast_node::New(varId, lineNo);
+    // 检查是否有数组维度
+    if (!ctx->T_L_BRACKET().empty()) {
+        // 数组声明
+        char * id = strdup(varId.c_str());
+        var_id_attr arrayName{id, lineNo};
 
-    // 检查是否有初值
-    if (ctx->T_ASSIGN()) {
-        // 有初值，遍历表达式
-        ast_node * init_expr = std::any_cast<ast_node *>(visitExpr(ctx->expr()));
+        // 获取数组维度
+        std::vector<ast_node *> dimensions;
+        for (auto intConst: ctx->T_INT_CONST()) {
+            std::string dimText = intConst->getText();
+            uint32_t dimVal = (uint32_t) stoull(dimText, nullptr, 0);
+            int64_t dimLineNo = (int64_t) intConst->getSymbol()->getLine();
+            dimensions.push_back(ast_node::New(digit_int_attr{dimVal, dimLineNo}));
+        }
 
-        // 创建带初值的变量定义节点
-        return ast_node::New(ast_operator_type::AST_OP_ASSIGN, id_node, init_expr, nullptr);
+        // 创建基本类型属性（需要从父上下文获取）
+        ast_node * array_node = create_array_decl(arrayName, dimensions);
+
+        // 检查是否有初始化
+        if (ctx->T_ASSIGN()) {
+            if (ctx->exprList()) {
+                // 数组初始化列表
+                ast_node * init_list = std::any_cast<ast_node *>(visitExprList(ctx->exprList()));
+                return ast_node::New(ast_operator_type::AST_OP_ASSIGN, array_node, init_list, nullptr);
+            } else if (ctx->expr()) {
+                // 单个表达式初始化
+                ast_node * init_expr = std::any_cast<ast_node *>(visitExpr(ctx->expr()));
+                return ast_node::New(ast_operator_type::AST_OP_ASSIGN, array_node, init_expr, nullptr);
+            }
+        }
+
+        return array_node;
     } else {
-        // 无初值的变量定义节点
+        // 普通变量定义
+        ast_node * id_node = ast_node::New(varId, lineNo);
+
+        // 检查是否有初值
+        if (ctx->T_ASSIGN()) {
+            if (ctx->expr()) {
+                // 表达式初始化
+                ast_node * init_expr = std::any_cast<ast_node *>(visitExpr(ctx->expr()));
+                return ast_node::New(ast_operator_type::AST_OP_ASSIGN, id_node, init_expr, nullptr);
+            }
+        }
+
         return id_node;
     }
 }

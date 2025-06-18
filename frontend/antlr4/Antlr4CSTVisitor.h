@@ -255,4 +255,9 @@ protected:
     /// @param ctx CST上下文
     /// @return std::any AST的节点
     std::any visitContinueStatement(MiniCParser::ContinueStatementContext * ctx) override;
+
+    /// @brief 非终结符exprList的分析
+    /// @param ctx CST上下文
+    /// @return std::any AST的节点
+    std::any visitExprList(MiniCParser::ExprListContext * ctx) override;
 };

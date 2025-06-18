@@ -140,6 +140,15 @@ enum class ast_operator_type : int {
     /// @brief continue语句
     AST_OP_CONTINUE,
 
+    /// @brief 数组声明
+    AST_OP_ARRAY_DECL,
+
+    /// @brief 数组下标访问
+    AST_OP_ARRAY_ACCESS,
+
+    /// @brief 数组初始化列表
+    AST_OP_ARRAY_INIT,
+
     // TODO 抽象语法树其它内部节点运算符追加
 
     /// @brief 最大标识符，表示非法运算符
@@ -337,3 +346,21 @@ ast_node * create_var_decl_stmt_node(type_attr & type, var_id_attr & id);
 /// @return ast_node* 变量声明语句节点
 ///
 ast_node * add_var_decl_node(ast_node * stmt_node, var_id_attr & id);
+
+/// @brief 创建数组声明节点
+/// @param type 数组元素类型
+/// @param id 数组名
+/// @param dimensions 数组维度大小列表
+/// @return 创建的数组声明节点
+ast_node * create_array_decl(var_id_attr & id, std::vector<ast_node *> dimensions);
+
+/// @brief 创建数组访问节点
+/// @param array_node 数组变量节点
+/// @param index_exprs 下标表达式列表
+/// @return 创建的数组访问节点
+ast_node * create_array_access(ast_node * array_node, std::vector<ast_node *> index_exprs);
+
+/// @brief 创建数组初始化列表节点
+/// @param init_exprs 初始化表达式列表
+/// @return 创建的数组初始化节点
+ast_node * create_array_init(std::vector<ast_node *> init_exprs);
