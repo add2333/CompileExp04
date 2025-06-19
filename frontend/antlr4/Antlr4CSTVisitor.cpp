@@ -16,11 +16,13 @@
 ///
 
 #include <cstddef>
+#include <iostream>
 #include <string>
 
 #include "Antlr4CSTVisitor.h"
 #include "AST.h"
 #include "AttrType.h"
+#include "Common.h"
 
 #define Instanceof(res, type, var) auto res = dynamic_cast<type>(var)
 
@@ -821,24 +823,40 @@ std::any MiniCCSTVisitor::visitExpressionStatement(MiniCParser::ExpressionStatem
     }
 }
 
-// ...existing code...
-
 std::any MiniCCSTVisitor::visitIfStatement(MiniCParser::IfStatementContext * ctx)
 {
-    // 识别文法产生式：T_IF T_L_PAREN expr T_R_PAREN statement (T_ELSE statement)?
-
     // 获取条件表达式
     ast_node * condExpr = std::any_cast<ast_node *>(visitExpr(ctx->expr()));
 
+    // std::cout << "Visiting statement: " << ctx->getText() << "\n";
+
     // 获取真分支语句块
-    ast_node * trueBlock = std::any_cast<ast_node *>(visitStatement(ctx->statement(0)));
+    std::any trueResult = visitStatement(ctx->statement(0));
+    ast_node * trueBlock;
+
+    // 检查是否为空语句
+    if (trueResult.type() == typeid(std::nullptr_t)) {
+        // 如果是空语句，创建一个空块
+        trueBlock = create_contain_node(ast_operator_type::AST_OP_BLOCK);
+    } else {
+        trueBlock = std::any_cast<ast_node *>(trueResult);
+    }
 
     // 创建IF节点
     ast_node * ifNode;
 
     if (ctx->T_ELSE()) {
         // 有else分支
-        ast_node * falseBlock = std::any_cast<ast_node *>(visitStatement(ctx->statement(1)));
+        std::any falseResult = visitStatement(ctx->statement(1));
+        ast_node * falseBlock;
+
+        // 检查是否为空语句
+        if (falseResult.type() == typeid(std::nullptr_t)) {
+            // 如果是空语句，创建一个空块
+            falseBlock = create_contain_node(ast_operator_type::AST_OP_BLOCK);
+        } else {
+            falseBlock = std::any_cast<ast_node *>(falseResult);
+        }
 
         // IF节点有三个子节点：条件、真分支、假分支
         ifNode = ast_node::New(ast_operator_type::AST_OP_IF, condExpr, trueBlock, falseBlock, nullptr);

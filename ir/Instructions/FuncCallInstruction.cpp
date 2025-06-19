@@ -16,6 +16,7 @@
 #include "FuncCallInstruction.h"
 #include "Function.h"
 #include "Common.h"
+#include "PointerType.h"
 #include "Type.h"
 
 /// @brief 含有参数的函数调用
@@ -70,7 +71,32 @@ void FuncCallInstruction::toString(std::string & str)
 
             auto operand = getOperand(k);
 
+            if (operand->getIsArray()) {
+                // 数组类型需要特殊处理
+                str +=
+                    static_cast<PointerType>(operand->getType()).getRootType()->toString() + " " + operand->getIRName();
+                for (int i = 0; i < operand->getArrayDimensions().size(); ++i) {
+                    str += "[" + std::to_string(operand->getArrayDimensions()[i]) + "]";
+                }
+            } else {
+                str += operand->getType()->toString() + " " + operand->getIRName();
+            }
+
+            if (k != (operandsNum - 1)) {
+                str += ", ";
+            }
+        }
+    } else {
+
+        // 有arg指令
+        for (int32_t k = 0; k < argCount; ++k) {
+
+            auto operand = getOperand(k);
+
             str += operand->getType()->toString() + " " + operand->getIRName();
+
+            if (operand->getIsArray()) {
+            }
 
             if (k != (operandsNum - 1)) {
                 str += ", ";

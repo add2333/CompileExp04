@@ -99,6 +99,13 @@ void Function::toString(std::string & str)
 
         std::string param_str = param->getType()->toString() + " " + param->getIRName();
 
+        if (param->getIsArray()) {
+			// 如果是数组形参，输出维度信息
+			for (auto dim: param->getArrayDimensions()) {
+				param_str += "[" + std::to_string(dim) + "]";
+			}
+		}
+
         str += param_str;
     }
 

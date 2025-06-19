@@ -384,9 +384,9 @@ bool IRGenerator::ir_function_formal_params(ast_node * node)
 /// @return 翻译是否成功，true：成功，false：失败
 bool IRGenerator::ir_function_formal_param(ast_node * node)
 {
-    // 形参节点的第一个子节点是类型，第二个是变量名
+    // 形参节点的第一个子节点是类型，第二个是变量名或数组访问节点
     ast_node * typeNode = node->sons[0];
-    ast_node * nameNode = node->sons[1];
+    ast_node * paramNode = node->sons[1];
 
     // 检查类型节点是否有效
     if (!typeNode->type) {
@@ -394,22 +394,94 @@ bool IRGenerator::ir_function_formal_param(ast_node * node)
         return false;
     }
 
-    // 为形参创建临时变量，插入参数列表
-    FormalParam * formalParam = new FormalParam(typeNode->type, nameNode->name);
-    module->getCurrentFunction()->getParams().push_back(formalParam);
+    // 判断是否为数组形参
+    if (paramNode->node_type == ast_operator_type::AST_OP_ARRAY_ACCESS) {
+        // 数组形参处理
+        // 第一个子节点是数组名
+        std::string arrayName = paramNode->sons[0]->name;
 
-    // 为形参创建局部变量，用于存储实际值
-    LocalVariable * paramVar = static_cast<LocalVariable *>(module->newVarValue(typeNode->type, nameNode->name));
-    if (!paramVar) {
-        // 错误：无法创建形参变量
-        minic_log(LOG_ERROR, "无法创建形参变量 %s", nameNode->name.c_str());
-        return false;
+        // 构建数组维度信息
+        std::vector<int32_t> dimensions;
+
+        // 第一维是未知维度，用 0 表示
+        dimensions.push_back(0);
+
+        // 后续子节点是各维度大小
+        for (size_t i = 1; i < paramNode->sons.size(); i++) {
+            ast_node * dimNode = paramNode->sons[i];
+            if (dimNode && dimNode->node_type == ast_operator_type::AST_OP_LEAF_LITERAL_UINT) {
+                int32_t dimSize = (int32_t) dimNode->integer_val;
+                dimensions.push_back(dimSize);
+            } else {
+                minic_log(LOG_ERROR, "数组参数维度必须是常量，数组参数：%s", arrayName.c_str());
+                return false;
+            }
+        }
+
+        // 创建形参参数变量，为数组形参，类型为数组元素类型
+        FormalParam * formalParam = new FormalParam(typeNode->type, arrayName);
+        formalParam->setIsArray(true);
+        formalParam->setArrayDimensions(dimensions);
+        module->getCurrentFunction()->getParams().push_back(formalParam);
+
+        // 创建数组类型的局部变量
+        LocalVariable * paramVar = static_cast<LocalVariable *>(module->newVarValue(typeNode->type, arrayName));
+        if (!paramVar) {
+            minic_log(LOG_ERROR, "无法创建数组形参变量 %s", arrayName.c_str());
+            return false;
+        }
+
+        // 设置数组维度信息和数组标志
+        paramVar->setArrayDimensions(dimensions);
+        paramVar->setIsArray(true);
+
+        // 创建赋值语句，把实参的值复制给变量
+        MoveInstruction * moveInst = new MoveInstruction(module->getCurrentFunction(), paramVar, formalParam);
+        node->blockInsts.addInst(moveInst);
+        moveInst->setIsArray(true);               // 设置为数组赋值
+        moveInst->setArrayDimensions(dimensions); // 设置数组维度信息
+
+        // 将变量保存到节点的val中
+        node->val = paramVar;
+
+        // 记录日志
+        std::string dimStr = "";
+        for (size_t i = 0; i < dimensions.size(); i++) {
+            dimStr += "[";
+            if (dimensions[i] == -1) {
+                dimStr += "?";
+            } else {
+                dimStr += std::to_string(dimensions[i]);
+            }
+            dimStr += "]";
+        }
+        minic_log(LOG_DEBUG,
+                  "创建数组形参: %s%s, 元素类型: %s",
+                  arrayName.c_str(),
+                  dimStr.c_str(),
+                  typeNode->type->toString().c_str());
+    } else {
+        // 原有的普通形参处理逻辑
+        std::string paramName = paramNode->name;
+
+        // 为形参创建临时变量，插入参数列表
+        FormalParam * formalParam = new FormalParam(typeNode->type, paramName);
+        module->getCurrentFunction()->getParams().push_back(formalParam);
+
+        // 为形参创建局部变量，用于存储实际值
+        LocalVariable * paramVar = static_cast<LocalVariable *>(module->newVarValue(typeNode->type, paramName));
+        if (!paramVar) {
+            minic_log(LOG_ERROR, "无法创建形参变量 %s", paramName.c_str());
+            return false;
+        }
+
+        // 创建赋值语句，把实参的值复制给变量
+        MoveInstruction * moveInst = new MoveInstruction(module->getCurrentFunction(), paramVar, formalParam);
+        node->blockInsts.addInst(moveInst);
+
+        // 将变量保存到节点的val中
+        node->val = paramVar;
     }
-    node->val = paramVar;
-
-    // 创建赋值语句，把实参的值复制给变量
-    MoveInstruction * moveInst = new MoveInstruction(module->getCurrentFunction(), paramVar, formalParam);
-    node->blockInsts.addInst(moveInst);
 
     return true;
 }
@@ -419,6 +491,7 @@ bool IRGenerator::ir_function_formal_param(ast_node * node)
 /// @return 翻译是否成功，true：成功，false：失败
 bool IRGenerator::ir_function_call(ast_node * node)
 {
+    minic_log(LOG_DEBUG, "开始生成 (%s) 函数调用ir", node->sons[0]->name.c_str());
     std::vector<Value *> realParams;
 
     // 获取当前正在处理的函数
@@ -448,7 +521,6 @@ bool IRGenerator::ir_function_call(ast_node * node)
     int32_t argsCount = (int32_t) paramsNode->sons.size();
 
     // 当前函数中调用函数实参个数最大值统计，实际上是统计实参传参需在栈中分配的大小
-    // 因为目前的语言支持的int和float都是四字节的，只统计个数即可
     if (argsCount > currentFunc->getMaxFuncCallArgCnt()) {
         currentFunc->setMaxFuncCallArgCnt(argsCount);
     }
@@ -480,24 +552,6 @@ bool IRGenerator::ir_function_call(ast_node * node)
                   calledFunction->getParams().size(),
                   realParams.size());
         return false;
-    }
-
-    // 检查每个参数的类型是否匹配
-    for (size_t i = 0; i < realParams.size(); ++i) {
-        FormalParam * formalParam = calledFunction->getParams()[i];
-        Value * actualParam = realParams[i];
-
-        // 类型兼容性检查
-        if ((formalParam->getType()) != (actualParam->getType())) {
-            minic_log(LOG_ERROR,
-                      "第%lld行的被调用函数(%s)参数类型不匹配，第%zu个参数期望%s类型，提供了%s类型",
-                      (long long) lineno,
-                      funcName.c_str(),
-                      i + 1,
-                      formalParam->getType()->toString().c_str(),
-                      actualParam->getType()->toString().c_str());
-            return false;
-        }
     }
 
     // 返回调用有返回值，则需要分配临时变量，用于保存函数调用的返回值
@@ -1773,22 +1827,35 @@ bool IRGenerator::ir_array_access(ast_node * node)
                                                          const_cast<Type *>(ptrType));
     node->blockInsts.addInst(addrInst);
 
-
     if (node->parent && node->parent->node_type == ast_operator_type::AST_OP_ASSIGN && node->parent->sons[0] == node) {
         // 如果是赋值操作，并且数组访问节点为该赋值操作的左节点，即目标操作数，
         // 则需要将结果值设置为指向元素的指针
         node->val = addrInst;
         minic_log(LOG_DEBUG, "生成数组赋值IR: %zu维数组，元素类型: %s", indexCount, elementType->toString().c_str());
         return true;
-    } else {
+    } else if (node->parent && node->parent->node_type == ast_operator_type::AST_OP_FUNC_REAL_PARAMS && indexCount < arrayVar->getArrayDimensionCount()) {
+        // 如果是数组的一部分作为函数的参数
+        // 则需要将结果值设置为指向元素的指针
+        // 指明当前仍然是一个数组并设置其剩余的维度大小
+        addrInst->setIsArray(true);
+        std::vector<int32_t> allDims = arrayVar->getArrayDimensions();
+        // 只保留当前维度之后的维度
+        std::vector<int32_t> dims(allDims.begin() + indexCount, allDims.end());
+		// 设置剩余维度
+        addrInst->setArrayDimensions(dims);
+		node->val = addrInst;
+		
+		minic_log(LOG_DEBUG, "生成数组作为函数参数IR: %zu维数组，元素类型: %s", indexCount, elementType->toString().c_str());
+		return true;
+	} else {
         // 如果是读取操作，则生成赋值指令，将指针的指向的地址的值取出
         // 将结果值设置为元素的值
-        UnaryInstruction * loadInst = new UnaryInstruction(currentFunc, IRInstOperator::IRINST_OP_DEREF, addrInst, elementType);
+        UnaryInstruction * loadInst =
+            new UnaryInstruction(currentFunc, IRInstOperator::IRINST_OP_DEREF, addrInst, elementType);
         node->blockInsts.addInst(loadInst);
         node->val = loadInst;
+        minic_log(LOG_DEBUG, "生成数组读取IR: %zu维数组，元素类型: %s", indexCount, elementType->toString().c_str());
     }
-
-    minic_log(LOG_DEBUG, "生成数组访问IR: %zu维数组，元素类型: %s", indexCount, elementType->toString().c_str());
 
     return true;
 }
