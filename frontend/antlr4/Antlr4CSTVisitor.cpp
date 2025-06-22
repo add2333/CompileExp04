@@ -290,13 +290,18 @@ std::any MiniCCSTVisitor::visitStatement(MiniCParser::StatementContext * ctx)
 ///
 std::any MiniCCSTVisitor::visitReturnStatement(MiniCParser::ReturnStatementContext * ctx)
 {
-    // 识别的文法产生式：returnStatement -> T_RETURN expr T_SEMICOLON
+    // 识别的文法产生式：returnStatement -> T_RETURN expr? T_SEMICOLON
 
-    // 非终结符，表达式expr遍历
-    auto exprNode = std::any_cast<ast_node *>(visitExpr(ctx->expr()));
-
-    // 创建返回节点，其孩子为Expr
-    return create_contain_node(ast_operator_type::AST_OP_RETURN, exprNode);
+    // 判断是否有返回表达式
+    if (ctx->expr()) {
+        // 非终结符，表达式expr遍历
+        auto exprNode = std::any_cast<ast_node *>(visitExpr(ctx->expr()));
+        // 创建返回节点，其孩子为Expr
+        return create_contain_node(ast_operator_type::AST_OP_RETURN, exprNode);
+    } else {
+        // 无返回值
+        return create_contain_node(ast_operator_type::AST_OP_RETURN);
+    }
 }
 
 /// @brief 非终结运算符expr的遍历

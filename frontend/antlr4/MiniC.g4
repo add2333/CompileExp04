@@ -51,7 +51,7 @@ exprList: expr (T_COMMA expr)*;
 
 // 目前语句支持return、赋值、if-else、while语句
 statement:
-	T_RETURN expr T_SEMICOLON										# returnStatement
+	T_RETURN expr? T_SEMICOLON										# returnStatement
 	| lVal T_ASSIGN expr T_SEMICOLON								# assignStatement
 	| block															# blockStatement
 	| T_IF T_L_PAREN expr T_R_PAREN statement (T_ELSE statement)?	# ifStatement
