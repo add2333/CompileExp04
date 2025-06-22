@@ -821,10 +821,8 @@ std::any MiniCCSTVisitor::visitExpressionStatement(MiniCParser::ExpressionStatem
         // 遍历expr非终结符，创建表达式节点后返回
         return visitExpr(ctx->expr());
     } else {
-        // 空语句
-
-        // 直接返回空指针，需要再把语句加入到语句块时要注意判断，空语句不要加入
-        return nullptr;
+        // 空语句，创建一个空块
+        return create_contain_node(ast_operator_type::AST_OP_BLOCK);
     }
 }
 
