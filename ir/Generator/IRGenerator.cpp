@@ -65,6 +65,7 @@ IRGenerator::IRGenerator(ast_node * _root, Module * _module) : root(_root), modu
     ast2ir_handlers[ast_operator_type::AST_OP_MUL] = &IRGenerator::ir_mul;
     ast2ir_handlers[ast_operator_type::AST_OP_DIV] = &IRGenerator::ir_div;
     ast2ir_handlers[ast_operator_type::AST_OP_MOD] = &IRGenerator::ir_mod;
+    ast2ir_handlers[ast_operator_type::AST_OP_NOT] = &IRGenerator::ir_logical_not;
 
     /* 控制流语句 */
     ast2ir_handlers[ast_operator_type::AST_OP_IF] = &IRGenerator::ir_if_statement;
@@ -1256,6 +1257,81 @@ bool IRGenerator::ir_logical_not(ast_node * node, LabelInstruction * trueLabel, 
             new CondGotoInstruction(module->getCurrentFunction(), cmpInst, trueLabel, falseLabel);
         // 保存条件跳转指令
         node->blockInsts.addInst(condGotoInst);
+        return true;
+    }
+
+    // 计算操作数
+    ast_node * operand = ir_visit_ast_node_with_2_labels(node->sons[0], falseLabel, trueLabel);
+    if (!operand) {
+        return false;
+    }
+
+    // 保存操作数的指令
+    node->blockInsts.addInst(operand->blockInsts);
+
+    return true;
+}
+
+/// @brief 逻辑非AST节点翻译成线性中间IR
+/// @param node AST节点
+/// @return 翻译是否成功，true：成功，false：失败
+bool IRGenerator::ir_logical_not(ast_node * node)
+{
+    // Function * currentFunc = module->getCurrentFunction();
+    LabelInstruction * trueLabel = new LabelInstruction(module->getCurrentFunction());
+    LabelInstruction * falseLabel = new LabelInstruction(module->getCurrentFunction());
+    LabelInstruction * endLabel = new LabelInstruction(module->getCurrentFunction());
+    // 创建一个临时变量，用于保存逻辑非的结果
+    LocalVariable * varValue = static_cast<LocalVariable *>(module->newVarValue(IntegerType::getTypeInt()));
+
+    // 如果子节点为常量或变量，则将变量转换为布尔值，并直接保存指令返回
+    if (node->sons[0]->isLeafNode()) {
+        // 计算左操作数
+        ast_node * left = ir_visit_ast_node(node->sons[0]);
+        if (!left) {
+            return false;
+        }
+        // 保存左操作数的指令
+        node->blockInsts.addInst(left->blockInsts);
+        // 创建比较指令
+        Value * boolZero = module->newConstInt(0);
+
+        BinaryInstruction * cmpInst = new BinaryInstruction(module->getCurrentFunction(),
+                                                            IRInstOperator::IRINST_OP_CMP_EQ_I,
+                                                            left->val,
+                                                            boolZero,
+                                                            IntegerType::getTypeBool());
+        // 保存比较指令
+        node->blockInsts.addInst(cmpInst);
+
+        // 创建条件跳转指令
+        CondGotoInstruction * condGotoInst =
+            new CondGotoInstruction(module->getCurrentFunction(), cmpInst, trueLabel, falseLabel);
+        // 保存条件跳转指令
+        node->blockInsts.addInst(condGotoInst);
+
+        // 创建真标签
+        node->blockInsts.addInst(trueLabel);
+        // 创建变量赋值语句，将变量赋值为1
+        MoveInstruction * trueAssignInst =
+            new MoveInstruction(module->getCurrentFunction(), varValue, module->newConstInt(1));
+        // 保存赋值指令
+        node->blockInsts.addInst(trueAssignInst);
+        // 创建跳转到结束的标签
+        node->blockInsts.addInst(new GotoInstruction(module->getCurrentFunction(), endLabel));
+
+        // 创建假标签
+        node->blockInsts.addInst(falseLabel);
+        // 创建变量赋值语句，将变量赋值为0
+        MoveInstruction * falseAssignInst =
+            new MoveInstruction(module->getCurrentFunction(), varValue, module->newConstInt(0));
+        // 保存赋值指令
+        node->blockInsts.addInst(falseAssignInst);
+
+        // 创建结束标签
+        node->blockInsts.addInst(endLabel);
+
+        node->val = varValue;
         return true;
     }
 

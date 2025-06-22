@@ -90,10 +90,10 @@ protected:
     /// @return 翻译是否成功，true：成功，false：失败
     bool ir_neg(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
 
-	/// @brief 整数乘法AST节点翻译成线性中间IR
-	/// @param node AST节点
-	/// @return 翻译是否成功，true：成功，false：失败
-	bool ir_mul(ast_node * node);
+    /// @brief 整数乘法AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_mul(ast_node * node);
 
     /// @brief 整数除法AST节点翻译成线性中间IR
     /// @param node AST节点
@@ -183,6 +183,11 @@ protected:
     /// @param falseLabel 假出口标签
     /// @return 翻译是否成功，true：成功，false：失败
     bool ir_logical_not(ast_node * node, LabelInstruction * trueLabel, LabelInstruction * falseLabel);
+
+    /// @brief 逻辑非AST节点翻译成线性中间IR
+    /// @param node AST节点
+    /// @return 翻译是否成功，true：成功，false：失败
+    bool ir_logical_not(ast_node * node);
 
     /* Comparison operations */
     /// @brief 等于比较AST节点翻译成线性中间IR
