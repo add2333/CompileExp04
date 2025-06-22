@@ -16,6 +16,7 @@
 ///
 #include <cstdint>
 #include <cstdio>
+#include <random>
 #include <unordered_map>
 #include <vector>
 
@@ -25,6 +26,7 @@
 #include "Common.h"
 #include "FormalParam.h"
 #include "Function.h"
+#include "GlobalVariable.h"
 #include "IRCode.h"
 #include "IRGenerator.h"
 #include "Instruction.h"
@@ -1122,9 +1124,23 @@ bool IRGenerator::ir_variable_declare(ast_node * node)
             }
 
             // 创建赋值指令
-            MoveInstruction * assignInst = new MoveInstruction(module->getCurrentFunction(), varValue, exprResult->val);
-            node->blockInsts.addInst(exprResult->blockInsts);
-            node->blockInsts.addInst(assignInst);
+            if (module->getCurrentFunction() == nullptr) {
+                // 如果是全局变量
+                GlobalVariable * globalVarValue = static_cast<GlobalVariable *>(varValue);
+                if (exprResult->node_type == ast_operator_type::AST_OP_NEG) {
+                    static Value * initVal = module->newConstInt(-exprResult->sons[0]->integer_val);
+                    globalVarValue->setInitValue(initVal);
+                    globalVarValue->setIsInitialized(true);
+                } else {
+                    globalVarValue->setInitValue(exprResult->val);
+                    globalVarValue->setIsInitialized(true);
+                }
+            } else {
+                MoveInstruction * assignInst =
+                    new MoveInstruction(module->getCurrentFunction(), varValue, exprResult->val);
+                node->blockInsts.addInst(exprResult->blockInsts);
+                node->blockInsts.addInst(assignInst);
+            }
         }
     } else {
         // 普通变量声明：int a;
@@ -1833,7 +1849,8 @@ bool IRGenerator::ir_array_access(ast_node * node)
         node->val = addrInst;
         minic_log(LOG_DEBUG, "生成数组赋值IR: %zu维数组，元素类型: %s", indexCount, elementType->toString().c_str());
         return true;
-    } else if (node->parent && node->parent->node_type == ast_operator_type::AST_OP_FUNC_REAL_PARAMS && indexCount < arrayVar->getArrayDimensionCount()) {
+    } else if (node->parent && node->parent->node_type == ast_operator_type::AST_OP_FUNC_REAL_PARAMS &&
+               indexCount < arrayVar->getArrayDimensionCount()) {
         // 如果是数组的一部分作为函数的参数
         // 则需要将结果值设置为指向元素的指针
         // 指明当前仍然是一个数组并设置其剩余的维度大小
@@ -1841,13 +1858,16 @@ bool IRGenerator::ir_array_access(ast_node * node)
         std::vector<int32_t> allDims = arrayVar->getArrayDimensions();
         // 只保留当前维度之后的维度
         std::vector<int32_t> dims(allDims.begin() + indexCount, allDims.end());
-		// 设置剩余维度
+        // 设置剩余维度
         addrInst->setArrayDimensions(dims);
-		node->val = addrInst;
-		
-		minic_log(LOG_DEBUG, "生成数组作为函数参数IR: %zu维数组，元素类型: %s", indexCount, elementType->toString().c_str());
-		return true;
-	} else {
+        node->val = addrInst;
+
+        minic_log(LOG_DEBUG,
+                  "生成数组作为函数参数IR: %zu维数组，元素类型: %s",
+                  indexCount,
+                  elementType->toString().c_str());
+        return true;
+    } else {
         // 如果是读取操作，则生成赋值指令，将指针的指向的地址的值取出
         // 将结果值设置为元素的值
         UnaryInstruction * loadInst =

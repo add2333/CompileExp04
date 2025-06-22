@@ -322,6 +322,7 @@ void Module::outputIR(const std::string & filePath)
 
         std::string str;
         var->toDeclareString(str);
+        var->toInitString(str);
         fprintf(fp, "%s\n", str.c_str());
     }
 

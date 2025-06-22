@@ -16,6 +16,7 @@
 ///
 #pragma once
 
+#include "Common.h"
 #include "GlobalValue.h"
 #include "IRConstant.h"
 
@@ -83,6 +84,24 @@ public:
         this->loadRegNo = regId;
     }
 
+    /// @brief 设置初始化值
+    /// @param val 初始化值
+    void setInitValue(Value * val)
+    {
+        this->initVal = val;
+        // 如果有初始化值，则不在BSS段
+        if (val) {
+            this->inBSSSection = false;
+        }
+    }
+
+    /// @brief 设置是否初始化
+    /// @param initialized 是否初始化
+    void setIsInitialized(bool initialized)
+    {
+        this->isInitialized = initialized;
+	}
+
     ///
     /// @brief Declare指令IR显示
     /// @param str
@@ -99,6 +118,16 @@ public:
         }
     }
 
+    /// @brief 初始化指令 IR 显示
+    void toInitString(std::string & str)
+    {
+
+        if (isInitialized) {
+            minic_log(LOG_DEBUG, "输出全局变量初始化信息 = %s", initVal->getIRName().c_str());
+            str += " = " + initVal->getIRName();
+        }
+    }
+
 private:
     ///
     /// @brief 变量加载到寄存器中时对应的寄存器编号
@@ -109,4 +138,10 @@ private:
     /// @brief 默认全局变量在BSS段，没有初始化，或者即使初始化过，但都值都为0
     ///
     bool inBSSSection = true;
+
+    /// @brief 初始化值
+    Value * initVal;
+
+    /// @brief 是否初始化
+    bool isInitialized = false;
 };
