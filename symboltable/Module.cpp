@@ -32,6 +32,8 @@ Module::Module(std::string _name) : name(_name)
     (void) newFunction("getint", IntegerType::getTypeInt(), {}, true);
     (void) newFunction("putch", VoidType::getType(), {new FormalParam{IntegerType::getTypeInt(), ""}}, true);
     (void) newFunction("getch", IntegerType::getTypeInt(), {}, true);
+	(void) newFunction("putarray", VoidType::getType(), {new FormalParam{IntegerType::getTypeInt(), ""}, new FormalParam{IntegerType::getTypeInt(), ""}}, true);
+    (void) newFunction("getarray", IntegerType::getTypeInt(), {new FormalParam{IntegerType::getTypeInt(), ""}}, true);
 }
 
 /// @brief 进入作用域，如进入函数体块、语句块等
